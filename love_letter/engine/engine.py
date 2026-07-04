@@ -190,15 +190,26 @@ class Engine:
                     )
                 ])
         else:
-            submitted_cards = [action.card_in_hand, action.other_card]
-            if sorted(submitted_cards) != sorted(expected_cards):
-                raise InvalidActionError([
-                    Violation(
-                        field="card_in_hand",
-                        message="Played and kept cards must match the player's hand plus drawn card",
-                        code="CARD_NOT_AVAILABLE",
-                    )
-                ])
+            if action.other_card is None:
+                # Princess discard: only card_in_hand matters
+                if action.card_in_hand != player.hand_card:
+                    raise InvalidActionError([
+                        Violation(
+                            field="card_in_hand",
+                            message="Played card must be the player's hand card",
+                            code="CARD_NOT_AVAILABLE",
+                        )
+                    ])
+            else:
+                submitted_cards = [action.card_in_hand, action.other_card]
+                if sorted(submitted_cards) != sorted(expected_cards):
+                    raise InvalidActionError([
+                        Violation(
+                            field="card_in_hand",
+                            message="Played and kept cards must match the player's hand plus drawn card",
+                            code="CARD_NOT_AVAILABLE",
+                        )
+                    ])
 
         # Step 1: Draw a card from the deck
         if state.deck:
@@ -220,6 +231,9 @@ class Engine:
             initial_options = expected_cards.copy()
             initial_options.remove(CardType.CHANCELLOR)
             player.hand_card = initial_options[0] if initial_options else None
+        elif action.card_in_hand == CardType.PRINCESS and action.other_card is None:
+            # Princess discard: player has no hand card after
+            player.hand_card = None
         else:
             player.hand_card = action.other_card  # Keep this card
         state.played_cards.append(
