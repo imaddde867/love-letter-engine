@@ -1,8 +1,10 @@
 """Engine for Love Letter game management."""
 
-from collections import Counter
+from __future__ import annotations
+
 import random
 import uuid
+from typing import Optional
 
 from love_letter.engine.effects.baron import BaronEffect
 from love_letter.engine.effects.chancellor import ChancellorEffect
@@ -22,7 +24,7 @@ from love_letter.models.state import GameState
 from love_letter.engine.errors import (
     GameOverError,
     InvalidActionError,
-    Violation,
+    PlayerNotActiveError,
     validate_action,
 )
 
@@ -76,11 +78,6 @@ class Engine:
 
         # Set aside top card facedown
         facedown_card = deck.pop(0) if deck else None
-        faceup_set_aside_cards: list[CardType] = []
-        if len(player_ids) == 2:
-            for _ in range(3):
-                if deck:
-                    faceup_set_aside_cards.append(deck.pop(0))
 
         # Determine favor threshold
         threshold = self.FAVOR_THRESHOLDS[len(player_ids)]
@@ -95,7 +92,6 @@ class Engine:
             round=1,
             deck=deck,
             facedown_card=facedown_card,
-            faceup_set_aside_cards=faceup_set_aside_cards,
             players=players,
             current_player_index=0,
             favor_token_threshold=threshold,
@@ -148,8 +144,6 @@ class Engine:
 
         # Validate action and raise InvalidActionError with violations
         violations = validate_action(action, player_id, state)
-        if isinstance(action, Action):
-            violations.extend(self._validate_chancellor_plan(state, action))
         if violations:
             raise InvalidActionError(violations)
 
@@ -157,53 +151,6 @@ class Engine:
         state = self._resolve_action(state, player_id, action)
 
         return state
-
-    def _validate_chancellor_plan(
-        self, state: GameState, action: Action
-    ) -> list[Violation]:
-        """Validate Chancellor's post-draw keep/return choice before mutation."""
-        if (
-            action.card_in_hand != CardType.CHANCELLOR
-            or not state.deck
-            or action.player_id not in state.players
-        ):
-            return []
-
-        drawn_for_turn = state.deck[0]
-        if Counter([state.players[action.player_id].hand_card, drawn_for_turn]) != Counter(
-            [action.card_in_hand, action.other_card]
-        ):
-            return []
-
-        chancellor_draws = state.deck[1:3]
-        if not chancellor_draws:
-            return []
-
-        candidates = [action.other_card, *chancellor_draws]
-        keep_card = action.chancellor_keep_card or action.other_card
-        cards_to_return = list(candidates)
-        if keep_card in cards_to_return:
-            cards_to_return.remove(keep_card)
-        else:
-            return [
-                Violation(
-                    field="chancellor_keep_card",
-                    message="Chancellor keep card must be one of the kept card plus drawn cards",
-                    code="INVALID_CHANCELLOR_KEEP",
-                )
-            ]
-
-        return_order = action.chancellor_return_order or cards_to_return
-        if Counter(return_order) != Counter(cards_to_return):
-            return [
-                Violation(
-                    field="chancellor_return_order",
-                    message="Chancellor return order must contain every non-kept card exactly once",
-                    code="INVALID_CHANCELLOR_RETURN_ORDER",
-                )
-            ]
-
-        return []
 
     def _resolve_action(
         self, state: GameState, player_id: str, action: Action
