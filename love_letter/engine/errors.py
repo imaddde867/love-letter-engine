@@ -160,4 +160,74 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
             code="INVALID_OTHER_CARD",
         ))
 
+    # Targeting cards require a valid target_player
+    _validate_target(action, state, violations)
+
+    # Guard-specific: guess required and cannot be GUARD
+    if action.card_in_hand == CardType.GUARD:
+        if not action.guess:
+            violations.append(Violation(
+                field="guess",
+                message="Guard requires a guess (card type)",
+                code="MISSING_GUARD_GUESS",
+            ))
+        elif action.guess == CardType.GUARD:
+            violations.append(Violation(
+                field="guess",
+                message="Cannot guess Guard",
+                code="GUARD_GUESSES_GUARD",
+            ))
+
     return violations
+
+
+def _validate_target(action: Any, state: Any, violations: list[Violation]) -> None:
+    """Validate target_player for cards that require a target.
+
+    Targeting cards: Guard, Priest, Baron, King (Prince allows self-target).
+
+    Args:
+        action: The action to validate.
+        state: The current game state.
+        violations: Mutable list of Violations to append to.
+    """
+    from love_letter.models.card import CardType
+
+    targeting_cards = {
+        CardType.GUARD,
+        CardType.PRIEST,
+        CardType.BARON,
+        CardType.KING,
+    }
+
+    if action.card_in_hand not in targeting_cards:
+        return
+
+    target_id = action.target_player
+
+    # Missing or empty target
+    if not target_id:
+        violations.append(Violation(
+            field="target_player",
+            message=f"{action.card_in_hand.name} requires a target_player",
+            code="MISSING_TARGET",
+        ))
+        return
+
+    # Target player does not exist in game
+    if target_id not in state.players:
+        violations.append(Violation(
+            field="target_player",
+            message=f"Target player '{target_id}' not found in game",
+            code="TARGET_NOT_FOUND",
+        ))
+        return
+
+    # Target player is eliminated
+    target = state.players[target_id]
+    if not target.is_active:
+        violations.append(Violation(
+            field="target_player",
+            message=f"Target player '{target_id}' is eliminated",
+            code="TARGET_NOT_ACTIVE",
+        ))

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from love_letter.models.action import Action
+from love_letter.models.card import CardType
 from love_letter.models.state import GameState
 
 
@@ -38,11 +39,14 @@ class ChancellorEffect:
                 state.facedown_card = None
                 break
 
-        # Player has 3 cards now: original hand + 2 drawn
-        # They keep one and return the other two to the bottom
-        # The action's other_card is what they keep
-        # Only the two non-kept cards return to bottom (not the played card)
-        cards_to_return = [c for c in drawn if c != action.other_card]
+        # Player keeps one card (other_card). The remaining cards
+        # (played CHANCELLOR + non-kept drawn card) return to deck bottom.
+        cards_to_return: list[CardType] = [CardType.CHANCELLOR]
+        for c in drawn:
+            if c != action.other_card:
+                cards_to_return.append(c)
+                break
+
         for card in cards_to_return:
             state.deck.insert(0, card)  # Bottom of deck
 
