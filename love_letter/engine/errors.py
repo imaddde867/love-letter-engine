@@ -184,7 +184,7 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
 def _validate_target(action: Any, state: Any, violations: list[Violation]) -> None:
     """Validate target_player for cards that require a target.
 
-    Targeting cards: Guard, Priest, Baron, King (Prince allows self-target).
+    Targeting cards: Guard, Priest, Baron, King, Prince.
 
     Args:
         action: The action to validate.
@@ -197,6 +197,7 @@ def _validate_target(action: Any, state: Any, violations: list[Violation]) -> No
         CardType.GUARD,
         CardType.PRIEST,
         CardType.BARON,
+        CardType.PRINCE,
         CardType.KING,
     }
 

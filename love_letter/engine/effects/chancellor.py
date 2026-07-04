@@ -5,6 +5,7 @@ from __future__ import annotations
 from love_letter.models.action import Action
 from love_letter.models.card import CardType
 from love_letter.models.state import GameState
+from love_letter.engine.errors import InvalidActionError, Violation
 
 
 class ChancellorEffect:
@@ -39,13 +40,31 @@ class ChancellorEffect:
                 state.facedown_card = None
                 break
 
-        # Player keeps one card (other_card). The remaining cards
-        # (played CHANCELLOR + non-kept drawn card) return to deck bottom.
+        choices = []
+        if actor.hand_card is not None and actor.hand_card != CardType.CHANCELLOR:
+            choices.append(actor.hand_card)
+        choices.extend(drawn)
+
+        if not choices:
+            actor.hand_card = action.other_card
+            return state
+
+        if action.other_card not in choices:
+            raise InvalidActionError([
+                Violation(
+                    field="other_card",
+                    message="Chancellor kept card must be one of the available choices",
+                    code="CARD_NOT_AVAILABLE",
+                )
+            ])
+
         cards_to_return: list[CardType] = [CardType.CHANCELLOR]
-        for c in drawn:
-            if c != action.other_card:
-                cards_to_return.append(c)
-                break
+        kept_card_removed = False
+        for card in choices:
+            if not kept_card_removed and card == action.other_card:
+                kept_card_removed = True
+                continue
+            cards_to_return.append(card)
 
         for card in cards_to_return:
             state.deck.insert(0, card)  # Bottom of deck

@@ -17,17 +17,26 @@ def _state_to_dict(state: GameState, player_id: str) -> dict:
     """Convert GameState to a JSON-serializable dict for the API response."""
     players = []
     for pid, player in state.players.items():
-        players.append(
-            {
-                "id": pid,
-                "is_active": player.is_active,
-                "hand_card": player.hand_card.value if player.hand_card else None,
-                "favor_tokens": player.favor_tokens,
-            }
-        )
+        player_state = {
+            "id": pid,
+            "is_active": player.is_active,
+            "hand_card": player.hand_card.value if player.hand_card else None,
+            "favor_tokens": player.favor_tokens,
+        }
+        if pid == player_id:
+            player_state["drawn_card"] = (
+                state.deck[0].value
+                if state.deck
+                else state.facedown_card.value if state.facedown_card else None
+            )
+        players.append(player_state)
 
     played_cards = [
-        {"player_id": entry["player_id"], "card": entry["card"].display_name}
+        {
+            "player_id": entry["player_id"],
+            "card": entry["card"].display_name,
+            "target_player": entry.get("target_player"),
+        }
         for entry in state.played_cards
     ]
 
@@ -47,7 +56,7 @@ app = FastAPI(title="Love Letter Engine", version="0.1.0")
 
 
 @app.post("/games", status_code=201)
-def create_game(request: CreateGameRequest):
+async def create_game(request: CreateGameRequest):
     """Create a new game."""
     if len(request.player_ids) < 2 or len(request.player_ids) > 6:
         raise HTTPException(
@@ -63,7 +72,7 @@ def create_game(request: CreateGameRequest):
 
 
 @app.get("/games/{game_id}")
-def get_state(game_id: str, player_id: str = Query(...)):
+async def get_state(game_id: str, player_id: str = Query(...)):
     """Get the current game state for a specific player."""
     try:
         state = engine.get_state(game_id, player_id)
@@ -74,7 +83,7 @@ def get_state(game_id: str, player_id: str = Query(...)):
 
 
 @app.post("/games/{game_id}/actions")
-def execute_action(game_id: str, request: ActionRequest):
+async def execute_action(game_id: str, request: ActionRequest):
     """Execute an action for a player in a game."""
     try:
         # Convert ActionRequest to internal Action

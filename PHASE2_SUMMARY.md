@@ -1,100 +1,68 @@
-# Phase 2: API Layer — Summary
+# Phase 2: API Layer Summary
 
 ## What Was Built
 
-### 1. Pydantic-Compatible Action Model
-- Converted `Action` from dataclass to `BaseModel`
-- Enables direct JSON parsing from API requests
-- Maintains backward compatibility with engine
+### Pydantic-Compatible Action Model
 
-### 2. REST API Endpoints
-Created `love_letter/api/` package with FastAPI:
+- Converted `Action` to a Pydantic `BaseModel`.
+- Keeps the engine interface usable from JSON request bodies.
 
-**Endpoints:**
-- `POST /games` — Create new game (returns 201)
-- `GET /games/{game_id}` — Get state for player
-- `POST /games/{game_id}/actions` — Execute action
+### REST API Layer
 
-**Features:**
-- Pydantic request/response validation
-- Structured error handling (400, 404, 422)
-- Game state serialization to JSON
+Created `love_letter/api/` with:
 
-### 3. Engine Fixes
+- `POST /games` - create a game.
+- `GET /games/{game_id}` - get state for a requesting player.
+- `POST /games/{game_id}/actions` - execute an action and return updated state.
 
-**Handmaid Protection Tracking:**
-- Added `protected_until_next_turn` flag to Player
-- Handmaid effect sets protection flag
-- Guard, Baron, King, Prince effects check protection before targeting
-- Protection clears at start of protected player's turn
+The state response includes:
 
-**Spy Bonus:**
-- Implemented Spy bonus awarding at round end
-- Only one active player who played a Spy gets extra favor token
-- No bonus if multiple players played Spies
+- `game_id`
+- `round`
+- `deck_remaining`
+- `favor_token_threshold`
+- `players`
+- `played_cards`
+- `your_id`
+
+For the requesting player, `players[*].drawn_card` exposes the next card needed to submit a valid action.
+
+### Engine Fixes
+
+- Handmaid protection tracking and clearing.
+- Targeting effects respect Handmaid protection.
+- Spy bonus at round end.
+- Chancellor card-loss regression fixed.
+- Guard/Priest/Baron/King/Prince target validation restored.
+- Guard guess validation restored.
+- Non-Chancellor actions reject impossible client-submitted card pairs.
+- Played-card history now records `target_player` where applicable.
 
 ## Test Coverage
 
-**95 tests passing** (up from 76 in Phase 1):
-- 4 new Pydantic Action tests
-- 4 API games endpoint tests
-- 4 API actions endpoint tests
-- 2 full game flow tests
-- 3 Handmaid protection tests
-- 2 Spy bonus tests
+Current suite:
 
-## Files Changed
+- API game/action/state tests.
+- Pydantic action tests.
+- Card effect tests.
+- Validation tests.
+- Handmaid protection tests.
+- Spy bonus tests.
+- Chancellor regression tests.
+- Property tests.
 
-**New files:**
-- `love_letter/api/__init__.py`
-- `love_letter/api/app.py` (FastAPI app)
-- `love_letter/api/schemas.py` (Pydantic schemas)
-- `tests/test_action_pydantic.py`
-- `tests/test_api_games.py`
-- `tests/test_api_actions.py`
-- `tests/test_api_full_game.py`
-- `tests/test_handmaid_protection.py`
-- `tests/test_spy_bonus.py`
+Verification:
 
-**Modified files:**
-- `love_letter/models/action.py` — Pydantic BaseModel
-- `love_letter/models/player.py` — Added protection flag
-- `love_letter/engine/engine.py` — Protection clearing, Spy bonus
-- `love_letter/engine/effects/guard.py` — Check protection
-- `love_letter/engine/effects/baron.py` — Check protection
-- `love_letter/engine/effects/king.py` — Check protection
-- `love_letter/engine/effects/prince.py` — Check protection
-- `love_letter/engine/effects/handmaid.py` — Set protection
-
-## API Examples
-
-**Create Game:**
 ```bash
-curl -X POST http://localhost:8000/games \
-  -H "Content-Type: application/json" \
-  -d '{"player_ids": ["alice", "bob"]}'
+.venv/bin/python -m pytest -q
 ```
 
-**Get State:**
-```bash
-curl "http://localhost:8000/games/{game_id}?player_id=alice"
-```
+Result: `115 passed in 0.79s`.
 
-**Execute Action:**
-```bash
-curl -X POST "http://localhost:8000/games/{game_id}/actions" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "player_id": "alice",
-    "action_type": "play_card",
-    "card_in_hand": 4,
-    "other_card": 9
-  }'
-```
+## Phase 3 Next Steps
 
-## Next Steps (Phase 3)
-
-- Bot interface (stateless functions)
-- Simulator for bot-vs-bot tournaments
-- Example bots (random, heuristic)
-- CLI commands (`python -m love_letter test`, `serve`)
+- Bot interface.
+- Legal-action generation, including `available_actions`.
+- Bot-vs-bot simulator.
+- Example bots.
+- CLI polish.

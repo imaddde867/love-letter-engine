@@ -24,6 +24,7 @@ from love_letter.models.state import GameState
 from love_letter.engine.errors import (
     GameOverError,
     InvalidActionError,
+    Violation,
     PlayerNotActiveError,
     validate_action,
 )
@@ -173,6 +174,32 @@ class Engine:
         if player.protected_until_next_turn:
             player.protected_until_next_turn = False
 
+        expected_cards = [player.hand_card]
+        if state.deck:
+            expected_cards.append(state.deck[0])
+        elif state.facedown_card is not None:
+            expected_cards.append(state.facedown_card)
+
+        if action.card_in_hand == CardType.CHANCELLOR:
+            if CardType.CHANCELLOR not in expected_cards:
+                raise InvalidActionError([
+                    Violation(
+                        field="card_in_hand",
+                        message="Played card must match the player's hand plus drawn card",
+                        code="CARD_NOT_AVAILABLE",
+                    )
+                ])
+        else:
+            submitted_cards = [action.card_in_hand, action.other_card]
+            if sorted(submitted_cards) != sorted(expected_cards):
+                raise InvalidActionError([
+                    Violation(
+                        field="card_in_hand",
+                        message="Played and kept cards must match the player's hand plus drawn card",
+                        code="CARD_NOT_AVAILABLE",
+                    )
+                ])
+
         # Step 1: Draw a card from the deck
         if state.deck:
             drawn_card = state.deck.pop(0)
@@ -189,9 +216,18 @@ class Engine:
         # The action specifies which is which via card_in_hand (played) and other_card (kept)
 
         # Step 2: Play the card (remove from hand, add to played)
-        player.hand_card = action.other_card  # Keep this card
+        if action.card_in_hand == CardType.CHANCELLOR:
+            initial_options = expected_cards.copy()
+            initial_options.remove(CardType.CHANCELLOR)
+            player.hand_card = initial_options[0] if initial_options else None
+        else:
+            player.hand_card = action.other_card  # Keep this card
         state.played_cards.append(
-            {"player_id": player_id, "card": action.card_in_hand}
+            {
+                "player_id": player_id,
+                "card": action.card_in_hand,
+                "target_player": action.target_player,
+            }
         )
 
         # Track cards played by this player (for Spy bonus)

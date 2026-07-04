@@ -123,6 +123,15 @@ def test_validate_action_king_missing_target():
     assert "MISSING_TARGET" in codes
 
 
+def test_validate_action_prince_missing_target():
+    """Prince without target_player returns MISSING_TARGET violation."""
+    action = _make_action(card_in_hand=CardType.PRINCE, target_player=None)
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_TARGET" in codes
+
+
 def test_validate_action_guard_missing_guess():
     """Guard without guess returns MISSING_GUARD_GUESS violation."""
     action = _make_action(guess=None)
@@ -158,6 +167,15 @@ def test_validate_action_target_eliminated():
     violations = validate_action(action, "alice", state)
     codes = [v.code for v in violations]
     assert "TARGET_NOT_ACTIVE" in codes
+
+
+def test_validate_action_prince_target_not_in_game():
+    """Prince with unknown target returns TARGET_NOT_FOUND violation."""
+    action = _make_action(card_in_hand=CardType.PRINCE, target_player="charlie")
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "TARGET_NOT_FOUND" in codes
 
 
 def test_validate_action_non_targeting_card_no_target_required():

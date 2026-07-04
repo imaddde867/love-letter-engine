@@ -1,55 +1,49 @@
 """Tests for full game flow via the API."""
 
-from fastapi.testclient import TestClient
+import asyncio
 
-from love_letter.api.app import app
+from love_letter.api.app import create_game, engine, execute_action, get_state
+from love_letter.api.schemas import ActionRequest, CreateGameRequest
+from love_letter.models.card import CardType
 
 
-client = TestClient(app)
+def _run(coro):
+    return asyncio.run(coro)
 
 
 def test_full_game_flow():
     """Test creating a game, getting state, and executing actions."""
-    # Create game
-    response = client.post("/games", json={"player_ids": ["alice", "bob"]})
-    assert response.status_code == 201
-    game_id = response.json()["game_id"]
+    created = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
+    game_id = created["game_id"]
 
-    # Get initial state
-    response = client.get(f"/games/{game_id}?player_id=alice")
-    assert response.status_code == 200
-    state = response.json()
+    state = _run(get_state(game_id, player_id="alice"))
     assert state["game_id"] == game_id
     assert len(state["players"]) == 2
     assert state["round"] == 1
 
-    # Execute an action (play Handmaid)
-    response = client.post(
-        f"/games/{game_id}/actions",
-        json={
-            "player_id": "alice",
-            "action_type": "play_card",
-            "card_in_hand": 4,  # Handmaid
-            "other_card": 9,  # Princess
-        },
-    )
-    assert response.status_code == 200
-    new_state = response.json()
+    engine_state = engine.get_state(game_id, "alice")
+    engine_state.players["alice"].hand_card = CardType.HANDMAID
+    engine_state.deck = [CardType.PRINCESS, CardType.GUARD]
+
+    new_state = _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="alice",
+            action_type="play_card",
+            card_in_hand=CardType.HANDMAID,
+            other_card=CardType.PRINCESS,
+        ),
+    ))
     assert new_state["round"] == 1
 
-    # Get state for bob
-    response = client.get(f"/games/{game_id}?player_id=bob")
-    assert response.status_code == 200
-    bob_state = response.json()
+    bob_state = _run(get_state(game_id, player_id="bob"))
     assert len(bob_state["players"]) == 2
 
 
 def test_game_over_after_threshold():
-    """Test that game ends when a player reaches the favor threshold."""
-    # Create 2-player game (threshold = 6)
-    response = client.post("/games", json={"player_ids": ["alice", "bob"]})
-    game_id = response.json()["game_id"]
+    """Test that two-player games use the expected favor threshold."""
+    created = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
+    game_id = created["game_id"]
 
-    # Verify the threshold is set correctly for 2 players
-    state = client.get(f"/games/{game_id}?player_id=alice").json()
+    state = _run(get_state(game_id, player_id="alice"))
     assert state["favor_token_threshold"] == 6

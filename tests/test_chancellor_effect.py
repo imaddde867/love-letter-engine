@@ -76,3 +76,26 @@ def test_chancellor_empty_deck_no_effect():
     # Should not raise
     ChancellorEffect.resolve(state, action)
     assert state.players["alice"].hand_card == CardType.GUARD
+
+
+def test_chancellor_rejects_kept_card_outside_available_choices():
+    """Chancellor cannot keep a card that was not in the choice set."""
+    import pytest
+
+    from love_letter.engine.errors import InvalidActionError
+
+    state = GameState(game_id="g1", round=1, deck=[CardType.PRIEST, CardType.BARON])
+    state.players["alice"] = Player(id="alice")
+    state.players["alice"].hand_card = CardType.GUARD
+
+    action = Action(
+        action_type="play_card",
+        card_in_hand=CardType.CHANCELLOR,
+        player_id="alice",
+        other_card=CardType.PRINCESS,
+    )
+
+    with pytest.raises(InvalidActionError) as exc_info:
+        ChancellorEffect.resolve(state, action)
+
+    assert [v.code for v in exc_info.value.violations] == ["CARD_NOT_AVAILABLE"]

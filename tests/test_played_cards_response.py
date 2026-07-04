@@ -1,89 +1,81 @@
 """Tests for played_cards field in API responses."""
 
-from fastapi.testclient import TestClient
+import asyncio
 
-from love_letter.api.app import app
+from love_letter.api.app import create_game, engine, execute_action, get_state
+from love_letter.api.schemas import ActionRequest, CreateGameRequest
+from love_letter.models.card import CardType
 
 
-client = TestClient(app)
+def _run(coro):
+    return asyncio.run(coro)
+
+
+def _create_game() -> str:
+    return _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))["game_id"]
+
+
+def _set_turn_cards(game_id: str, player_id: str, hand: CardType, drawn: CardType) -> None:
+    state = engine.get_state(game_id, player_id)
+    state.players[player_id].hand_card = hand
+    state.deck = [drawn, CardType.GUARD, CardType.PRIEST]
 
 
 def test_get_state_includes_played_cards_field():
     """GET /games/{id} must include played_cards in the response."""
-    create_response = client.post(
-        "/games", json={"player_ids": ["alice", "bob"]}
-    )
-    game_id = create_response.json()["game_id"]
+    game_id = _create_game()
 
-    response = client.get(f"/games/{game_id}?player_id=alice")
-    assert response.status_code == 200
-    data = response.json()
-    assert "played_cards" in data, (
-        "played_cards field is missing from GET /games/{id} response"
-    )
+    data = _run(get_state(game_id, player_id="alice"))
+    assert "played_cards" in data
     assert isinstance(data["played_cards"], list)
 
 
 def test_played_cards_populated_after_action():
     """played_cards must be populated after a card is played."""
-    create_response = client.post(
-        "/games", json={"player_ids": ["alice", "bob"]}
-    )
-    game_id = create_response.json()["game_id"]
+    game_id = _create_game()
+    _set_turn_cards(game_id, "alice", CardType.HANDMAID, CardType.PRINCESS)
 
-    # Execute an action (play Handmaid - no extra fields needed)
-    response = client.post(
-        f"/games/{game_id}/actions",
-        json={
-            "player_id": "alice",
-            "action_type": "play_card",
-            "card_in_hand": 4,  # Handmaid
-            "other_card": 9,  # Princess
-        },
-    )
-    assert response.status_code == 200
-    new_state = response.json()
-    assert "played_cards" in new_state
+    new_state = _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="alice",
+            action_type="play_card",
+            card_in_hand=CardType.HANDMAID,
+            other_card=CardType.PRINCESS,
+        ),
+    ))
     assert len(new_state["played_cards"]) == 1
 
     card_entry = new_state["played_cards"][0]
     assert card_entry["player_id"] == "alice"
-    # Card name should be a string matching PLAN spec, not an int
-    assert card_entry["card"] == "Handmaid", (
-        f"Expected card name 'Handmaid', got {card_entry['card']!r}"
-    )
+    assert card_entry["card"] == "Handmaid"
 
 
 def test_played_cards_multiple_entries():
     """played_cards must accumulate entries across multiple actions."""
-    create_response = client.post(
-        "/games", json={"player_ids": ["alice", "bob"]}
-    )
-    game_id = create_response.json()["game_id"]
+    game_id = _create_game()
+    _set_turn_cards(game_id, "alice", CardType.HANDMAID, CardType.PRINCESS)
 
-    # Alice plays Handmaid
-    client.post(
-        f"/games/{game_id}/actions",
-        json={
-            "player_id": "alice",
-            "action_type": "play_card",
-            "card_in_hand": 4,  # Handmaid
-            "other_card": 9,  # Princess
-        },
-    )
+    _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="alice",
+            action_type="play_card",
+            card_in_hand=CardType.HANDMAID,
+            other_card=CardType.PRINCESS,
+        ),
+    ))
 
-    # Bob plays Countess (no target_player needed)
-    response = client.post(
-        f"/games/{game_id}/actions",
-        json={
-            "player_id": "bob",
-            "action_type": "play_card",
-            "card_in_hand": 8,  # Countess
-            "other_card": 9,  # Princess
-        },
-    )
-    assert response.status_code == 200
-    state = response.json()
+    _set_turn_cards(game_id, "bob", CardType.COUNTESS, CardType.PRINCESS)
+    state = _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="bob",
+            action_type="play_card",
+            card_in_hand=CardType.COUNTESS,
+            other_card=CardType.PRINCESS,
+        ),
+    ))
     assert len(state["played_cards"]) == 2
     assert state["played_cards"][0]["card"] == "Handmaid"
     assert state["played_cards"][1]["card"] == "Countess"
@@ -91,43 +83,51 @@ def test_played_cards_multiple_entries():
 
 def test_your_id_matches_requesting_player():
     """your_id in the response must match the requesting player."""
-    create_response = client.post(
-        "/games", json={"player_ids": ["alice", "bob"]}
-    )
-    game_id = create_response.json()["game_id"]
+    game_id = _create_game()
 
-    response = client.get(f"/games/{game_id}?player_id=bob")
-    assert response.status_code == 200
-    data = response.json()
-    assert "your_id" in data, "your_id field is missing from GET /games/{id} response"
+    data = _run(get_state(game_id, player_id="bob"))
     assert data["your_id"] == "bob"
 
 
 def test_get_state_after_action_has_both_fields():
     """GET /games/{id} after actions must include both played_cards and your_id."""
-    create_response = client.post(
-        "/games", json={"player_ids": ["alice", "bob"]}
-    )
-    game_id = create_response.json()["game_id"]
+    game_id = _create_game()
+    _set_turn_cards(game_id, "alice", CardType.HANDMAID, CardType.PRINCESS)
 
-    # Play a card via POST action
-    client.post(
-        f"/games/{game_id}/actions",
-        json={
-            "player_id": "alice",
-            "action_type": "play_card",
-            "card_in_hand": 4,  # Handmaid
-            "other_card": 9,  # Princess
-        },
-    )
+    _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="alice",
+            action_type="play_card",
+            card_in_hand=CardType.HANDMAID,
+            other_card=CardType.PRINCESS,
+        ),
+    ))
 
-    # GET state for bob - must have both fields
-    response = client.get(f"/games/{game_id}?player_id=bob")
-    assert response.status_code == 200
-    data = response.json()
-    assert "played_cards" in data, "played_cards missing from GET response"
-    assert "your_id" in data, "your_id missing from GET response"
-    assert isinstance(data["played_cards"], list)
+    data = _run(get_state(game_id, player_id="bob"))
+    assert "played_cards" in data
+    assert "your_id" in data
     assert len(data["played_cards"]) == 1
     assert data["played_cards"][0]["card"] == "Handmaid"
     assert data["your_id"] == "bob"
+
+
+def test_played_cards_include_target_player_when_present():
+    """played_cards entries include target_player to match the PLAN contract."""
+    game_id = _create_game()
+    _set_turn_cards(game_id, "alice", CardType.GUARD, CardType.PRIEST)
+
+    response = _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="alice",
+            action_type="play_card",
+            card_in_hand=CardType.GUARD,
+            other_card=CardType.PRIEST,
+            target_player="bob",
+            guess=CardType.BARON,
+        ),
+    ))
+
+    played_card = response["played_cards"][0]
+    assert played_card["target_player"] == "bob"

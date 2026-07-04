@@ -123,3 +123,57 @@ def test_execute_action_raises_game_over_when_threshold_reached():
 
     with pytest.raises(GameOverError):
         engine.execute_action(game_id, "alice", action)
+
+
+def test_execute_action_rejects_card_not_available_to_player():
+    """A player can only play one of their actual two turn cards."""
+    from love_letter.engine.engine import Engine
+    from love_letter.engine.errors import InvalidActionError
+    from love_letter.models.action import Action
+    from love_letter.models.card import CardType
+
+    engine = Engine()
+    game_id = engine.create_game(["alice", "bob"])
+    state = engine.get_state(game_id, "alice")
+    state.players["alice"].hand_card = CardType.GUARD
+    state.deck = [CardType.PRIEST, CardType.BARON]
+
+    action = Action(
+        action_type="play_card",
+        card_in_hand=CardType.HANDMAID,
+        other_card=CardType.PRINCESS,
+        player_id="alice",
+    )
+
+    with pytest.raises(InvalidActionError) as exc_info:
+        engine.execute_action(game_id, "alice", action)
+
+    assert [v.code for v in exc_info.value.violations] == ["CARD_NOT_AVAILABLE"]
+    assert state.players["alice"].hand_card == CardType.GUARD
+    assert state.deck == [CardType.PRIEST, CardType.BARON]
+
+
+def test_execute_action_rejects_chancellor_not_available_to_player():
+    """Chancellor cannot be played unless it is in the actual turn cards."""
+    from love_letter.engine.engine import Engine
+    from love_letter.engine.errors import InvalidActionError
+    from love_letter.models.action import Action
+    from love_letter.models.card import CardType
+
+    engine = Engine()
+    game_id = engine.create_game(["alice", "bob"])
+    state = engine.get_state(game_id, "alice")
+    state.players["alice"].hand_card = CardType.GUARD
+    state.deck = [CardType.PRIEST, CardType.BARON]
+
+    action = Action(
+        action_type="play_card",
+        card_in_hand=CardType.CHANCELLOR,
+        other_card=CardType.PRINCESS,
+        player_id="alice",
+    )
+
+    with pytest.raises(InvalidActionError) as exc_info:
+        engine.execute_action(game_id, "alice", action)
+
+    assert [v.code for v in exc_info.value.violations] == ["CARD_NOT_AVAILABLE"]
