@@ -1,0 +1,104 @@
+"""FastAPI application for the Love Letter engine."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Optional
+
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import JSONResponse
+
+from love_letter.api.schemas import ActionRequest, CreateGameRequest, ErrorResponse
+from love_letter.engine.engine import Engine
+from love_letter.models.action import Action
+from love_letter.models.card import CardType
+from love_letter.models.player import Player
+from love_letter.models.state import GameState
+
+engine = Engine()
+
+
+def _state_to_dict(state: GameState, player_id: str) -> dict:
+    """Convert GameState to a JSON-serializable dict for the API response."""
+    players = []
+    for pid, player in state.players.items():
+        players.append(
+            {
+                "id": pid,
+                "is_active": player.is_active,
+                "hand_card": player.hand_card.value if player.hand_card else None,
+                "favor_tokens": player.favor_tokens,
+            }
+        )
+
+    return {
+        "game_id": state.game_id,
+        "round": state.round,
+        "deck_remaining": state.deck_count,
+        "favor_token_threshold": state.favor_token_threshold,
+        "players": players,
+        "current_player_index": state.current_player_index,
+        "your_id": player_id,
+    }
+
+
+app = FastAPI(title="Love Letter Engine", version="0.1.0")
+
+
+@app.post("/games", status_code=201)
+def create_game(request: CreateGameRequest):
+    """Create a new game."""
+    if len(request.player_ids) < 2 or len(request.player_ids) > 6:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "invalid_request",
+                "message": "Player count must be between 2 and 6",
+            },
+        )
+
+    game_id = engine.create_game(request.player_ids)
+    return {"game_id": game_id}
+
+
+@app.get("/games/{game_id}")
+def get_state(game_id: str, player_id: str = Query(...)):
+    """Get the current game state for a specific player."""
+    try:
+        state = engine.get_state(game_id, player_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    return _state_to_dict(state, player_id)
+
+
+@app.post("/games/{game_id}/actions")
+def execute_action(game_id: str, request: ActionRequest):
+    """Execute an action for a player in a game."""
+    try:
+        # Convert ActionRequest to internal Action
+        action = Action(
+            action_type=request.action_type,
+            card_in_hand=request.card_in_hand,
+            other_card=request.other_card,
+            player_id=request.player_id,
+            target_player=request.target_player,
+            guess=request.guess,
+        )
+
+        state = engine.execute_action(game_id, request.player_id, action)
+        return _state_to_dict(state, request.player_id)
+
+    except Exception as e:
+        # Return structured error for API consumers
+        if hasattr(e, "violations") and e.violations:
+            violations = [v.message for v in e.violations]
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "invalid_action",
+                    "message": "One or more validation violations",
+                    "violations": violations,
+                },
+            )
+        raise HTTPException(status_code=400, detail=str(e))
