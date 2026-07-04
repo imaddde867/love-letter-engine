@@ -1,0 +1,38 @@
+"""King card effect implementation."""
+
+from __future__ import annotations
+
+from love_letter.models.action import Action
+from love_letter.models.state import GameState
+
+
+class KingEffect:
+    """Resolve King card effect: swap hands with target.
+
+    Choose another player and trade hands with them.
+    """
+
+    @staticmethod
+    def resolve(state: GameState, action: Action) -> GameState:
+        """Apply King effect to the game state.
+
+        Args:
+            state: The current game state.
+            action: The King action with target_player.
+
+        Returns:
+            The updated game state (hands swapped).
+
+        Raises:
+            ValueError: If target_player is missing.
+        """
+        if not action.target_player:
+            raise ValueError("King requires a target_player")
+
+        actor = state.players[action.player_id]
+        target = state.players[action.target_player]
+
+        # Swap hands
+        actor.hand_card, target.hand_card = target.hand_card, actor.hand_card
+
+        return state
