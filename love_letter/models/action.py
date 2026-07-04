@@ -19,6 +19,8 @@ class Action:
         player_id: The ID of the player taking the action.
         target_player: Optional target player ID (for Guard, Priest, Baron, King).
         guess: Optional guessed card type (for Guard).
+        chancellor_keep_card: Optional card to keep after Chancellor draws.
+        chancellor_return_order: Optional ordered cards returned to the deck bottom.
     """
 
     action_type: str
@@ -27,3 +29,5 @@ class Action:
     player_id: str
     target_player: Optional[str] = None
     guess: Optional[CardType] = None
+    chancellor_keep_card: Optional[CardType] = None
+    chancellor_return_order: Optional[list[CardType]] = None

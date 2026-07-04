@@ -7,30 +7,25 @@ from love_letter.models.player import Player
 from love_letter.models.state import GameState
 
 
-def test_chancellor_draws_two_and_returns_two():
-    """Chancellor: draw 2 cards, keep 1, return 1 to bottom of deck.
-
-    The played card (CHANCELLOR) goes to played_cards before the effect runs,
-    so only 1 drawn card returns to the deck.
-    """
+def test_chancellor_draws_two_keeps_one_and_returns_two_to_bottom():
+    """Chancellor chooses from the kept card plus two drawn cards."""
     state = GameState(game_id="g1", round=1, deck=[CardType.GUARD, CardType.PRIEST])
     state.players["alice"] = Player(id="alice")
-    state.players["alice"].hand_card = CardType.CHANCELLOR
+    state.players["alice"].hand_card = CardType.KING
 
-    # Keep GUARD, return PRIEST to bottom
+    # Keep drawn PRIEST, return original KING then drawn GUARD to bottom.
     action = Action(
         action_type="play_card",
         card_in_hand=CardType.CHANCELLOR,
         player_id="alice",
-        other_card=CardType.GUARD,
+        other_card=CardType.KING,
+        chancellor_keep_card=CardType.PRIEST,
+        chancellor_return_order=[CardType.KING, CardType.GUARD],
     )
 
     ChancellorEffect.resolve(state, action)
-    # Alice should keep the GUARD
-    assert state.players["alice"].hand_card == CardType.GUARD
-    # Deck should have 1 card returned to bottom (PRIEST)
-    assert len(state.deck) == 1
-    assert state.deck[0] == CardType.PRIEST
+    assert state.players["alice"].hand_card == CardType.PRIEST
+    assert state.deck == [CardType.KING, CardType.GUARD]
 
 
 def test_chancellor_empty_deck_no_effect():

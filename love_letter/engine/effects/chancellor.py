@@ -29,22 +29,28 @@ class ChancellorEffect:
         actor = state.players[action.player_id]
 
         # Draw 2 cards (or fewer if deck is short)
-        drawn: list[CardType] = []
+        drawn = []
         for _ in range(2):
             if state.deck:
                 drawn.append(state.deck.pop(0))
-            elif state.facedown_card is not None:
-                drawn.append(state.facedown_card)
-                state.facedown_card = None
-                break
 
-        # Player has 3 cards now: original hand + 2 drawn
-        # They keep one and return the other two to the bottom
-        # The action's other_card is what they keep
-        # Only the two non-kept cards return to bottom (not the played card)
-        cards_to_return = [c for c in drawn if c != action.other_card]
-        for card in cards_to_return:
-            state.deck.insert(0, card)  # Bottom of deck
+        if not drawn:
+            actor.hand_card = action.other_card
+            return state
 
-        actor.hand_card = action.other_card
+        candidates = [actor.hand_card, *drawn]
+        keep_card = action.chancellor_keep_card or action.other_card
+
+        cards_to_return = list(candidates)
+        if keep_card in cards_to_return:
+            cards_to_return.remove(keep_card)
+        else:
+            raise ValueError("Chancellor keep card must be one of the available cards")
+
+        return_order = action.chancellor_return_order or cards_to_return
+        if sorted(return_order) != sorted(cards_to_return):
+            raise ValueError("Chancellor return order must match the returned cards")
+
+        state.deck.extend(return_order)
+        actor.hand_card = keep_card
         return state

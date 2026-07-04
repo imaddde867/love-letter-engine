@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections import Counter
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -130,7 +131,13 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
         ))
         return violations
 
-    # Check player is active
+    if action.action_type != "play_card":
+        violations.append(Violation(
+            field="action_type",
+            message=f"Unsupported action type: {action.action_type}",
+            code="UNSUPPORTED_ACTION_TYPE",
+        ))
+
     if action.player_id != player_id:
         violations.append(Violation(
             field="player_id",
@@ -138,26 +145,124 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
             code="PLAYER_MISMATCH",
         ))
 
-    # Check player exists and is active in state
     if player_id not in state.players:
         violations.append(Violation(
             field="player_id",
             message=f"Player {player_id} not found in game",
             code="PLAYER_NOT_FOUND",
         ))
-    elif not state.players[player_id].is_active:
+        return violations
+
+    actor = state.players[player_id]
+    if not actor.is_active:
         violations.append(Violation(
             field="player_id",
             message=f"Player {player_id} is eliminated",
             code="PLAYER_NOT_ACTIVE",
         ))
 
-    # Check card_in_hand is valid
-    if action.card_in_hand == CardType.PRINCESS and action.other_card is None:
+    active_player_ids = [
+        pid for pid, player in state.players.items()
+        if player.is_active
+    ]
+    if active_player_ids:
+        expected_player = active_player_ids[
+            state.current_player_index % len(active_player_ids)
+        ]
+        if player_id != expected_player:
+            violations.append(Violation(
+                field="player_id",
+                message=f"It is {expected_player}'s turn, not {player_id}'s",
+                code="NOT_CURRENT_PLAYER",
+            ))
+
+    if actor.hand_card is None:
         violations.append(Violation(
-            field="other_card",
-            message="Princess discard requires other_card to be None",
-            code="INVALID_OTHER_CARD",
+            field="card_in_hand",
+            message=f"Player {player_id} has no card in hand",
+            code="NO_CARD_IN_HAND",
         ))
+    elif not state.deck:
+        violations.append(Violation(
+            field=None,
+            message="Cannot take a turn when the deck is empty",
+            code="ROUND_OVER",
+        ))
+    else:
+        available_cards = Counter([actor.hand_card, state.deck[0]])
+        requested_cards = Counter([action.card_in_hand, action.other_card])
+        if requested_cards != available_cards:
+            violations.append(Violation(
+                field="card_in_hand",
+                message="card_in_hand and other_card must match the player's hand plus drawn card",
+                code="CARDS_NOT_AVAILABLE",
+            ))
+
+        if (
+            CardType.COUNTESS in available_cards
+            and any(card in available_cards for card in (CardType.KING, CardType.PRINCE))
+            and action.card_in_hand != CardType.COUNTESS
+        ):
+            violations.append(Violation(
+                field="card_in_hand",
+                message="Countess must be played when held with King or Prince",
+                code="COUNTESS_REQUIRED",
+            ))
+
+    target_required_cards = {
+        CardType.GUARD,
+        CardType.PRIEST,
+        CardType.BARON,
+        CardType.KING,
+    }
+    if action.card_in_hand in target_required_cards:
+        if not action.target_player:
+            violations.append(Violation(
+                field="target_player",
+                message=f"{action.card_in_hand.display_name} requires a target_player",
+                code="MISSING_TARGET",
+            ))
+        elif action.target_player == player_id:
+            violations.append(Violation(
+                field="target_player",
+                message=f"{action.card_in_hand.display_name} must target another player",
+                code="INVALID_TARGET_SELF",
+            ))
+
+    if action.card_in_hand == CardType.PRINCE and not action.target_player:
+        violations.append(Violation(
+            field="target_player",
+            message="Prince requires a target_player",
+            code="MISSING_TARGET",
+        ))
+
+    if action.target_player:
+        target = state.players.get(action.target_player)
+        if target is None:
+            violations.append(Violation(
+                field="target_player",
+                message=f"Target player {action.target_player} not found",
+                code="TARGET_NOT_FOUND",
+            ))
+        elif not target.is_active:
+            violations.append(Violation(
+                field="target_player",
+                message=f"Target player {action.target_player} is eliminated",
+                code="TARGET_NOT_ACTIVE",
+            ))
+
+    if action.card_in_hand == CardType.GUARD:
+        if action.guess is None:
+            violations.append(Violation(
+                field="guess",
+                message="Guard requires a guess",
+                code="MISSING_GUESS",
+            ))
+        elif action.guess == CardType.GUARD:
+            violations.append(Violation(
+                field="guess",
+                message="Guard cannot guess Guard",
+                code="INVALID_GUARD_GUESS",
+            ))
 
     return violations
