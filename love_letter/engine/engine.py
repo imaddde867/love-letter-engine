@@ -6,6 +6,16 @@ import random
 import uuid
 from typing import Optional
 
+from love_letter.engine.effects.baron import BaronEffect
+from love_letter.engine.effects.chancellor import ChancellorEffect
+from love_letter.engine.effects.countess import CountessEffect
+from love_letter.engine.effects.guard import GuardEffect
+from love_letter.engine.effects.handmaid import HandmaidEffect
+from love_letter.engine.effects.king import KingEffect
+from love_letter.engine.effects.priest import PriestEffect
+from love_letter.engine.effects.prince import PrinceEffect
+from love_letter.engine.effects.princess import PrincessEffect
+from love_letter.engine.effects.spy import SpyEffect
 from love_letter.models.action import Action
 from love_letter.models.card import CardType
 from love_letter.models.player import Player
@@ -227,7 +237,7 @@ class Engine:
     def _apply_card_effect(
         self, state: GameState, player_id: str, action: Action
     ) -> GameState:
-        """Apply the effect of a played card.
+        """Apply the effect of a played card using strategy pattern.
 
         Args:
             state: The current game state.
@@ -239,172 +249,24 @@ class Engine:
         """
         card = action.card_in_hand
 
-        # Guard: target + guess
-        if card == CardType.GUARD:
-            return self._resolve_guard(state, player_id, action)
+        effect_map: dict[CardType, type] = {
+            CardType.GUARD: GuardEffect,
+            CardType.PRIEST: PriestEffect,
+            CardType.BARON: BaronEffect,
+            CardType.HANDMAID: HandmaidEffect,
+            CardType.PRINCE: PrinceEffect,
+            CardType.CHANCELLOR: ChancellorEffect,
+            CardType.KING: KingEffect,
+            CardType.COUNTESS: CountessEffect,
+            CardType.PRINCESS: PrincessEffect,
+            CardType.SPY: SpyEffect,
+        }
 
-        # Priest: reveal target's hand
-        if card == CardType.PRIEST:
-            return self._resolve_priest(state, player_id, action)
+        effect_cls = effect_map.get(card)
+        if effect_cls is None:
+            raise ValueError(f"Unknown card type: {card}")
 
-        # Baron: compare hands, lower eliminated
-        if card == CardType.BARON:
-            return self._resolve_baron(state, player_id, action)
-
-        # Handmaid: self-protection (no immediate effect on state)
-        if card == CardType.HANDMAID:
-            return state
-
-        # Prince: target discards and redraws
-        if card == CardType.PRINCE:
-            return self._resolve_prince(state, player_id, action)
-
-        # Chancellor: draw 2, keep 1, return 2 to bottom
-        if card == CardType.CHANCELLOR:
-            return self._resolve_chancellor(state, player_id, action)
-
-        # King: swap hands with target
-        if card == CardType.KING:
-            return self._resolve_king(state, player_id, action)
-
-        # Countess: no effect (but may force discard if holding King/Prince)
-        if card == CardType.COUNTESS:
-            return state
-
-        # Princess: discard = elimination
-        if card == CardType.PRINCESS:
-            player = state.players[player_id]
-            player.eliminate()
-            return state
-
-        # Spy: no immediate effect
-        if card == CardType.SPY:
-            return state
-
-        return state
-
-    def _resolve_guard(
-        self, state: GameState, player_id: str, action: Action
-    ) -> GameState:
-        """Resolve Guard effect: guess target's card."""
-        target_id = action.target_player
-        guess = action.guess
-        if not target_id or not guess:
-            raise ValueError("Guard requires target_player and guess")
-
-        # Check if target is protected by Handmaid
-        # (Handmaid protection lasts until the start of their next turn)
-        # For simplicity, we'll check if the target has Handmaid in hand
-        # Actually, Handmaid protection is a state flag, not a card in hand
-        # We'll track this in the Player model later
-
-        target = state.players[target_id]
-        if target.hand_card == guess:
-            target.eliminate()
-
-        return state
-
-    def _resolve_priest(
-        self, state: GameState, player_id: str, action: Action
-    ) -> GameState:
-        """Resolve Priest effect: reveal target's hand (no state change)."""
-        # Priest reveals the target's hand card to the actor
-        # This is information only, no state changes needed for engine
-        return state
-
-    def _resolve_baron(
-        self, state: GameState, player_id: str, action: Action
-    ) -> GameState:
-        """Resolve Baron effect: compare hands, lower eliminated."""
-        target_id = action.target_player
-        if not target_id:
-            raise ValueError("Baron requires target_player")
-
-        player = state.players[player_id]
-        target = state.players[target_id]
-
-        player_value = player.hand_card.value
-        target_value = target.hand_card.value
-
-        if player_value < target_value:
-            player.eliminate()
-        elif target_value < player_value:
-            target.eliminate()
-        # Tie: nothing happens
-
-        return state
-
-    def _resolve_prince(
-        self, state: GameState, player_id: str, action: Action
-    ) -> GameState:
-        """Resolve Prince effect: target discards and redraws."""
-        target_id = action.target_player
-        if not target_id:
-            raise ValueError("Prince requires target_player")
-
-        target = state.players[target_id]
-
-        # Discard target's hand
-        discarded_card = target.hand_card
-        target.hand_card = None
-
-        # If they discarded the Princess, they are eliminated and don't redraw
-        if discarded_card == CardType.PRINCESS:
-            target.eliminate()
-            return state
-
-        # Redraw from deck or facedown
-        if state.deck:
-            target.hand_card = state.deck.pop(0)
-        elif state.facedown_card is not None:
-            target.hand_card = state.facedown_card
-            state.facedown_card = None
-
-        return state
-
-    def _resolve_chancellor(
-        self, state: GameState, player_id: str, action: Action
-    ) -> GameState:
-        """Resolve Chancellor effect: draw 2, keep 1, return 2 to bottom."""
-        player = state.players[player_id]
-
-        # Draw 2 cards (or fewer if deck is short)
-        drawn: list[CardType] = []
-        for _ in range(2):
-            if state.deck:
-                drawn.append(state.deck.pop(0))
-            elif state.facedown_card is not None:
-                drawn.append(state.facedown_card)
-                state.facedown_card = None
-                break
-
-        # Player has 3 cards now: original hand + 2 drawn
-        # They keep one and return the other two to the bottom
-        # For simplicity, we'll return them in the order they were drawn
-        cards_to_return = [c for c in drawn if c != action.other_card]
-        # Actually, the player chooses which to keep. The action's other_card is what they keep.
-        # So we return the rest.
-        for card in cards_to_return:
-            state.deck.insert(0, card)  # Bottom of deck
-
-        player.hand_card = action.other_card
-        return state
-
-    def _resolve_king(
-        self, state: GameState, player_id: str, action: Action
-    ) -> GameState:
-        """Resolve King effect: swap hands with target."""
-        target_id = action.target_player
-        if not target_id:
-            raise ValueError("King requires target_player")
-
-        player = state.players[player_id]
-        target = state.players[target_id]
-
-        # Swap hands
-        player.hand_card, target.hand_card = target.hand_card, player.hand_card
-
-        return state
+        return effect_cls.resolve(state, action)
 
     def _is_round_over(self, state: GameState) -> bool:
         """Check if the round should end.
