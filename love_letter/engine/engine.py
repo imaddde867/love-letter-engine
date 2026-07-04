@@ -1,8 +1,10 @@
 """Engine for Love Letter game management."""
 
-from collections import Counter
+from __future__ import annotations
+
 import random
 import uuid
+from typing import Optional
 
 from love_letter.engine.effects.baron import BaronEffect
 from love_letter.engine.effects.chancellor import ChancellorEffect
@@ -23,6 +25,7 @@ from love_letter.engine.errors import (
     GameOverError,
     InvalidActionError,
     Violation,
+    PlayerNotActiveError,
     validate_action,
 )
 
@@ -76,11 +79,6 @@ class Engine:
 
         # Set aside top card facedown
         facedown_card = deck.pop(0) if deck else None
-        faceup_set_aside_cards: list[CardType] = []
-        if len(player_ids) == 2:
-            for _ in range(3):
-                if deck:
-                    faceup_set_aside_cards.append(deck.pop(0))
 
         # Determine favor threshold
         threshold = self.FAVOR_THRESHOLDS[len(player_ids)]
@@ -95,7 +93,6 @@ class Engine:
             round=1,
             deck=deck,
             facedown_card=facedown_card,
-            faceup_set_aside_cards=faceup_set_aside_cards,
             players=players,
             current_player_index=0,
             favor_token_threshold=threshold,
@@ -148,8 +145,6 @@ class Engine:
 
         # Validate action and raise InvalidActionError with violations
         violations = validate_action(action, player_id, state)
-        if isinstance(action, Action):
-            violations.extend(self._validate_chancellor_plan(state, action))
         if violations:
             raise InvalidActionError(violations)
 
@@ -157,53 +152,6 @@ class Engine:
         state = self._resolve_action(state, player_id, action)
 
         return state
-
-    def _validate_chancellor_plan(
-        self, state: GameState, action: Action
-    ) -> list[Violation]:
-        """Validate Chancellor's post-draw keep/return choice before mutation."""
-        if (
-            action.card_in_hand != CardType.CHANCELLOR
-            or not state.deck
-            or action.player_id not in state.players
-        ):
-            return []
-
-        drawn_for_turn = state.deck[0]
-        if Counter([state.players[action.player_id].hand_card, drawn_for_turn]) != Counter(
-            [action.card_in_hand, action.other_card]
-        ):
-            return []
-
-        chancellor_draws = state.deck[1:3]
-        if not chancellor_draws:
-            return []
-
-        candidates = [action.other_card, *chancellor_draws]
-        keep_card = action.chancellor_keep_card or action.other_card
-        cards_to_return = list(candidates)
-        if keep_card in cards_to_return:
-            cards_to_return.remove(keep_card)
-        else:
-            return [
-                Violation(
-                    field="chancellor_keep_card",
-                    message="Chancellor keep card must be one of the kept card plus drawn cards",
-                    code="INVALID_CHANCELLOR_KEEP",
-                )
-            ]
-
-        return_order = action.chancellor_return_order or cards_to_return
-        if Counter(return_order) != Counter(cards_to_return):
-            return [
-                Violation(
-                    field="chancellor_return_order",
-                    message="Chancellor return order must contain every non-kept card exactly once",
-                    code="INVALID_CHANCELLOR_RETURN_ORDER",
-                )
-            ]
-
-        return []
 
     def _resolve_action(
         self, state: GameState, player_id: str, action: Action
@@ -222,6 +170,36 @@ class Engine:
         """
         player = state.players[player_id]
 
+        # Clear Handmaid protection at the start of the player's turn
+        if player.protected_until_next_turn:
+            player.protected_until_next_turn = False
+
+        expected_cards = [player.hand_card]
+        if state.deck:
+            expected_cards.append(state.deck[0])
+        elif state.facedown_card is not None:
+            expected_cards.append(state.facedown_card)
+
+        if action.card_in_hand == CardType.CHANCELLOR:
+            if CardType.CHANCELLOR not in expected_cards:
+                raise InvalidActionError([
+                    Violation(
+                        field="card_in_hand",
+                        message="Played card must match the player's hand plus drawn card",
+                        code="CARD_NOT_AVAILABLE",
+                    )
+                ])
+        else:
+            submitted_cards = [action.card_in_hand, action.other_card]
+            if sorted(submitted_cards) != sorted(expected_cards):
+                raise InvalidActionError([
+                    Violation(
+                        field="card_in_hand",
+                        message="Played and kept cards must match the player's hand plus drawn card",
+                        code="CARD_NOT_AVAILABLE",
+                    )
+                ])
+
         # Step 1: Draw a card from the deck
         if state.deck:
             drawn_card = state.deck.pop(0)
@@ -238,9 +216,18 @@ class Engine:
         # The action specifies which is which via card_in_hand (played) and other_card (kept)
 
         # Step 2: Play the card (remove from hand, add to played)
-        player.hand_card = action.other_card  # Keep this card
+        if action.card_in_hand == CardType.CHANCELLOR:
+            initial_options = expected_cards.copy()
+            initial_options.remove(CardType.CHANCELLOR)
+            player.hand_card = initial_options[0] if initial_options else None
+        else:
+            player.hand_card = action.other_card  # Keep this card
         state.played_cards.append(
-            {"player_id": player_id, "card": action.card_in_hand}
+            {
+                "player_id": player_id,
+                "card": action.card_in_hand,
+                "target_player": action.target_player,
+            }
         )
 
         # Track cards played by this player (for Spy bonus)
@@ -346,6 +333,14 @@ class Engine:
         # Award favor tokens to winners
         for winner in winners:
             winner.add_favor()
+
+        # Award Spy bonus: if only one active player played a Spy, give them extra favor
+        spy_players = [
+            p for p in active_players
+            if CardType.SPY in p.cards_played
+        ]
+        if len(spy_players) == 1:
+            spy_players[0].add_favor()
 
         # Check if any player has reached the threshold
         # (Game over check happens in execute_action after this)

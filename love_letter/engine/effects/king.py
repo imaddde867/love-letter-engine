@@ -32,6 +32,10 @@ class KingEffect:
         actor = state.players[action.player_id]
         target = state.players[action.target_player]
 
+        # Protected players cannot be targeted
+        if target.protected_until_next_turn:
+            return state
+
         # Swap hands
         actor.hand_card, target.hand_card = target.hand_card, actor.hand_card
 

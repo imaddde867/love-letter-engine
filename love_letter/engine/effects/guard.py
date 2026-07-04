@@ -37,6 +37,10 @@ class GuardEffect:
 
         target = state.players[target_id]
 
+        # Protected players cannot be eliminated
+        if target.protected_until_next_turn:
+            return state
+
         # Check if target has the guessed card
         if target.hand_card == guess:
             target.eliminate()

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from love_letter.models.action import Action
+from love_letter.models.card import CardType
 from love_letter.models.state import GameState
+from love_letter.engine.errors import InvalidActionError, Violation
 
 
 class ChancellorEffect:
@@ -29,28 +31,43 @@ class ChancellorEffect:
         actor = state.players[action.player_id]
 
         # Draw 2 cards (or fewer if deck is short)
-        drawn = []
+        drawn: list[CardType] = []
         for _ in range(2):
             if state.deck:
                 drawn.append(state.deck.pop(0))
+            elif state.facedown_card is not None:
+                drawn.append(state.facedown_card)
+                state.facedown_card = None
+                break
 
-        if not drawn:
+        choices = []
+        if actor.hand_card is not None and actor.hand_card != CardType.CHANCELLOR:
+            choices.append(actor.hand_card)
+        choices.extend(drawn)
+
+        if not choices:
             actor.hand_card = action.other_card
             return state
 
-        candidates = [actor.hand_card, *drawn]
-        keep_card = action.chancellor_keep_card or action.other_card
+        if action.other_card not in choices:
+            raise InvalidActionError([
+                Violation(
+                    field="other_card",
+                    message="Chancellor kept card must be one of the available choices",
+                    code="CARD_NOT_AVAILABLE",
+                )
+            ])
 
-        cards_to_return = list(candidates)
-        if keep_card in cards_to_return:
-            cards_to_return.remove(keep_card)
-        else:
-            raise ValueError("Chancellor keep card must be one of the available cards")
+        cards_to_return: list[CardType] = [CardType.CHANCELLOR]
+        kept_card_removed = False
+        for card in choices:
+            if not kept_card_removed and card == action.other_card:
+                kept_card_removed = True
+                continue
+            cards_to_return.append(card)
 
-        return_order = action.chancellor_return_order or cards_to_return
-        if sorted(return_order) != sorted(cards_to_return):
-            raise ValueError("Chancellor return order must match the returned cards")
+        for card in cards_to_return:
+            state.deck.insert(0, card)  # Bottom of deck
 
-        state.deck.extend(return_order)
-        actor.hand_card = keep_card
+        actor.hand_card = action.other_card
         return state

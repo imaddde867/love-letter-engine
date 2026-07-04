@@ -34,6 +34,10 @@ class PrinceEffect:
 
         target = state.players[action.target_player]
 
+        # Protected players cannot be targeted
+        if target.protected_until_next_turn:
+            return state
+
         # Discard target's hand
         discarded_card = target.hand_card
         target.hand_card = None
