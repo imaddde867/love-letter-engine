@@ -33,6 +33,10 @@ class BaronEffect:
         actor = state.players[action.player_id]
         target = state.players[action.target_player]
 
+        # Protected players cannot be eliminated
+        if target.protected_until_next_turn:
+            return state
+
         actor_value = actor.hand_card.value
         target_value = target.hand_card.value
 

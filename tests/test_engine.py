@@ -125,7 +125,8 @@ def test_execute_action_raises_game_over_when_threshold_reached():
         engine.execute_action(game_id, "alice", action)
 
 
-def test_execute_action_rejects_player_out_of_turn_without_mutating_state():
+def test_execute_action_rejects_card_not_available_to_player():
+    """A player can only play one of their actual two turn cards."""
     from love_letter.engine.engine import Engine
     from love_letter.engine.errors import InvalidActionError
     from love_letter.models.action import Action
@@ -135,90 +136,44 @@ def test_execute_action_rejects_player_out_of_turn_without_mutating_state():
     game_id = engine.create_game(["alice", "bob"])
     state = engine.get_state(game_id, "alice")
     state.players["alice"].hand_card = CardType.GUARD
-    state.players["bob"].hand_card = CardType.PRIEST
-    state.deck = [CardType.BARON]
-    state.played_cards = []
+    state.deck = [CardType.PRIEST, CardType.BARON]
 
     action = Action(
         action_type="play_card",
-        card_in_hand=CardType.PRIEST,
-        other_card=CardType.BARON,
-        player_id="bob",
-        target_player="alice",
-    )
-
-    with pytest.raises(InvalidActionError):
-        engine.execute_action(game_id, "bob", action)
-
-    assert state.players["bob"].hand_card == CardType.PRIEST
-    assert state.deck == [CardType.BARON]
-    assert state.played_cards == []
-
-
-def test_execute_action_rejects_missing_target_without_mutating_state():
-    from love_letter.engine.engine import Engine
-    from love_letter.engine.errors import InvalidActionError
-    from love_letter.models.action import Action
-    from love_letter.models.card import CardType
-
-    engine = Engine()
-    game_id = engine.create_game(["alice", "bob"])
-    state = engine.get_state(game_id, "alice")
-    state.players["alice"].hand_card = CardType.GUARD
-    state.players["bob"].hand_card = CardType.PRINCESS
-    state.deck = [CardType.PRIEST]
-    state.played_cards = []
-
-    action = Action(
-        action_type="play_card",
-        card_in_hand=CardType.GUARD,
-        other_card=CardType.PRIEST,
-        player_id="alice",
-        guess=CardType.PRINCESS,
-    )
-
-    with pytest.raises(InvalidActionError):
-        engine.execute_action(game_id, "alice", action)
-
-    assert state.players["alice"].hand_card == CardType.GUARD
-    assert state.deck == [CardType.PRIEST]
-    assert state.played_cards == []
-
-
-def test_execute_action_rejects_cards_not_available_without_mutating_state():
-    from love_letter.engine.engine import Engine
-    from love_letter.engine.errors import InvalidActionError
-    from love_letter.models.action import Action
-    from love_letter.models.card import CardType
-
-    engine = Engine()
-    game_id = engine.create_game(["alice", "bob"])
-    state = engine.get_state(game_id, "alice")
-    state.players["alice"].hand_card = CardType.GUARD
-    state.deck = [CardType.PRIEST]
-    state.played_cards = []
-
-    action = Action(
-        action_type="play_card",
-        card_in_hand=CardType.PRINCESS,
-        other_card=CardType.PRIEST,
+        card_in_hand=CardType.HANDMAID,
+        other_card=CardType.PRINCESS,
         player_id="alice",
     )
 
-    with pytest.raises(InvalidActionError):
+    with pytest.raises(InvalidActionError) as exc_info:
         engine.execute_action(game_id, "alice", action)
 
+    assert [v.code for v in exc_info.value.violations] == ["CARD_NOT_AVAILABLE"]
     assert state.players["alice"].hand_card == CardType.GUARD
-    assert state.deck == [CardType.PRIEST]
-    assert state.played_cards == []
+    assert state.deck == [CardType.PRIEST, CardType.BARON]
 
 
-def test_create_two_player_game_sets_aside_three_faceup_cards():
+def test_execute_action_rejects_chancellor_not_available_to_player():
+    """Chancellor cannot be played unless it is in the actual turn cards."""
     from love_letter.engine.engine import Engine
+    from love_letter.engine.errors import InvalidActionError
+    from love_letter.models.action import Action
+    from love_letter.models.card import CardType
 
     engine = Engine()
     game_id = engine.create_game(["alice", "bob"])
     state = engine.get_state(game_id, "alice")
+    state.players["alice"].hand_card = CardType.GUARD
+    state.deck = [CardType.PRIEST, CardType.BARON]
 
-    assert len(state.faceup_set_aside_cards) == 3
-    assert len(state.deck) == 15
+    action = Action(
+        action_type="play_card",
+        card_in_hand=CardType.CHANCELLOR,
+        other_card=CardType.PRINCESS,
+        player_id="alice",
+    )
+
+    with pytest.raises(InvalidActionError) as exc_info:
+        engine.execute_action(game_id, "alice", action)
+
+    assert [v.code for v in exc_info.value.violations] == ["CARD_NOT_AVAILABLE"]

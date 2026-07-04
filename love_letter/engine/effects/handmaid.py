@@ -24,6 +24,6 @@ class HandmaidEffect:
         Returns:
             The updated game state (unchanged, protection is tracked separately).
         """
-        # Handmaid protection is tracked as a state flag
-        # For now, no immediate state change
+        actor = state.players[action.player_id]
+        actor.protected_until_next_turn = True
         return state
