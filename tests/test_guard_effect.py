@@ -18,6 +18,7 @@ def test_guard_correct_guess_eliminate_target():
     action = Action(
         action_type="play_card",
         card_in_hand=CardType.GUARD,
+        player_id="alice",
         other_card=CardType.PRIEST,
         target_player="bob",
         guess=CardType.BARON,
@@ -38,6 +39,7 @@ def test_guard_wrong_guess_no_effect():
     action = Action(
         action_type="play_card",
         card_in_hand=CardType.GUARD,
+        player_id="alice",
         other_card=CardType.PRIEST,
         target_player="bob",
         guess=CardType.BARON,
@@ -53,6 +55,7 @@ def test_guard_requires_target_and_guess():
     action = Action(
         action_type="play_card",
         card_in_hand=CardType.GUARD,
+        player_id="alice",
         other_card=CardType.PRIEST,
     )
 
@@ -76,6 +79,7 @@ def test_guard_does_not_affect_other_players():
     action = Action(
         action_type="play_card",
         card_in_hand=CardType.GUARD,
+        player_id="alice",
         other_card=CardType.PRIEST,
         target_player="bob",
         guess=CardType.BARON,
