@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
-from typing import Optional
-
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-from love_letter.api.schemas import ActionRequest, CreateGameRequest, ErrorResponse
+from love_letter.api.schemas import ActionRequest, CreateGameRequest
 from love_letter.engine.engine import Engine
 from love_letter.models.action import Action
-from love_letter.models.card import CardType
-from love_letter.models.player import Player
-from love_letter.models.state import GameState
 
 engine = Engine()
 
