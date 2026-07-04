@@ -21,6 +21,13 @@ from love_letter.models.card import CardType
 from love_letter.models.player import Player
 from love_letter.models.state import GameState
 
+from love_letter.engine.errors import (
+    GameOverError,
+    InvalidActionError,
+    PlayerNotActiveError,
+    validate_action,
+)
+
 
 class Engine:
     """Manages multiple concurrent Love Letter games in memory.
@@ -126,54 +133,24 @@ class Engine:
 
         Raises:
             KeyError: If game_id or player_id is not found.
-            ValueError: If the action is invalid.
+            GameOverError: If the game has already ended.
+            InvalidActionError: If the action is invalid.
         """
         state = self.get_state(game_id, player_id)
 
-        # Validate action
-        self._validate_action(state, player_id, action)
+        # Check if game is over before executing
+        if self._is_game_over(state):
+            raise GameOverError(game_id)
+
+        # Validate action and raise InvalidActionError with violations
+        violations = validate_action(action, player_id, state)
+        if violations:
+            raise InvalidActionError(violations)
 
         # Execute the action
         state = self._resolve_action(state, player_id, action)
 
         return state
-
-    def _validate_action(self, state: GameState, player_id: str, action: Action) -> None:
-        """Validate an action against the current game state.
-
-        Args:
-            state: The current game state.
-            player_id: The ID of the player taking the action.
-            action: The action to validate.
-
-        Raises:
-            ValueError: If the action is invalid, with details in the message.
-        """
-        player = state.players[player_id]
-
-        # Check player is active
-        if not player.is_active:
-            raise ValueError(f"Player '{player_id}' is eliminated and cannot act")
-
-        # Check card_in_hand matches player's hand
-        if action.card_in_hand != player.hand_card:
-            raise ValueError(
-                f"Player '{player_id}' must play their hand card "
-                f"{player.hand_card}, not {action.card_in_hand}"
-            )
-
-        # Check other_card is the remaining card
-        # (Player has two cards after drawing: the one they played and the one they keep)
-        # This validation happens after the draw step in the engine flow
-
-        # Check target_player exists and is active (for targeting cards)
-        if action.target_player:
-            if action.target_player not in state.players:
-                raise ValueError(f"Target player '{action.target_player}' not found")
-            if not state.players[action.target_player].is_active:
-                raise ValueError(
-                    f"Target player '{action.target_player}' is eliminated"
-                )
 
     def _resolve_action(
         self, state: GameState, player_id: str, action: Action

@@ -29,7 +29,7 @@ class ChancellorEffect:
         actor = state.players[action.player_id]
 
         # Draw 2 cards (or fewer if deck is short)
-        drawn: list = []
+        drawn: list[CardType] = []
         for _ in range(2):
             if state.deck:
                 drawn.append(state.deck.pop(0))
@@ -41,8 +41,8 @@ class ChancellorEffect:
         # Player has 3 cards now: original hand + 2 drawn
         # They keep one and return the other two to the bottom
         # The action's other_card is what they keep
-        # The played card (card_in_hand) is also returned
-        cards_to_return = [action.card_in_hand] + [c for c in drawn if c != action.other_card]
+        # Only the two non-kept cards return to bottom (not the played card)
+        cards_to_return = [c for c in drawn if c != action.other_card]
         for card in cards_to_return:
             state.deck.insert(0, card)  # Bottom of deck
 

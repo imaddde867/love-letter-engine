@@ -94,3 +94,32 @@ def test_get_state_two_player_has_two_players():
     game_id = engine.create_game(["alice", "bob"])
     state = engine.get_state(game_id, "alice")
     assert len(state.players) == 2
+
+
+def test_execute_action_raises_game_over_when_threshold_reached():
+    """Engine raises GameOverError when game is over."""
+    from love_letter.engine.engine import Engine
+    from love_letter.engine.errors import GameOverError
+    from love_letter.models.action import Action
+    from love_letter.models.card import CardType
+
+    engine = Engine()
+    game_id = engine.create_game(["alice", "bob"])
+    state = engine.get_state(game_id, "alice")
+
+    # Force a player to reach threshold
+    for _ in range(10):
+        state.players["alice"].add_favor()
+
+    # Create a dummy action for the test
+    action = Action(
+        action_type="play_card",
+        card_in_hand=CardType.GUARD,
+        other_card=CardType.PRIEST,
+        player_id="alice",
+        target_player="bob",
+        guess=CardType.BARON,
+    )
+
+    with pytest.raises(GameOverError):
+        engine.execute_action(game_id, "alice", action)

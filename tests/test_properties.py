@@ -91,8 +91,8 @@ def test_active_players_are_subset_of_all_players():
     assert active_ids.issubset(all_ids)
 
 
-@settings(max_examples=50)
 @given(st.integers(min_value=2, max_value=6))
+@settings(max_examples=50)
 def test_game_creation_with_valid_player_counts(player_count):
     """Games can be created with 2-6 players."""
     engine = Engine()
