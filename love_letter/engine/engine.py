@@ -299,8 +299,6 @@ class Engine:
             winner.add_favor()
 
         # Award Spy bonus: if only one active player played a Spy, give them extra favor
-        from love_letter.models.card import CardType
-
         spy_players = [
             p for p in active_players
             if CardType.SPY in p.cards_played

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from love_letter.api.schemas import ActionRequest, CreateGameRequest
 from love_letter.engine.engine import Engine
 from love_letter.models.action import Action
+from love_letter.models.state import GameState
 
 engine = Engine()
 
