@@ -1,0 +1,17 @@
+[project]
+name = "love-letter"
+version = "0.1.0"
+description = "A robust backend engine for Love Letter card game."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "hypothesis>=6.0"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
