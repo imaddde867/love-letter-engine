@@ -25,6 +25,11 @@ def _state_to_dict(state: GameState, player_id: str) -> dict:
             }
         )
 
+    played_cards = [
+        {"player_id": entry["player_id"], "card": entry["card"].display_name}
+        for entry in state.played_cards
+    ]
+
     return {
         "game_id": state.game_id,
         "round": state.round,
@@ -32,6 +37,7 @@ def _state_to_dict(state: GameState, player_id: str) -> dict:
         "favor_token_threshold": state.favor_token_threshold,
         "players": players,
         "current_player_index": state.current_player_index,
+        "played_cards": played_cards,
         "your_id": player_id,
     }
 
