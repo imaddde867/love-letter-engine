@@ -8,6 +8,11 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "hypothesis>=6.0"]
+test = [
+    "fastapi>=0.100",
+    "httpx>=0.25",
+    "uvicorn>=0.20",
+]
 
 [build-system]
 requires = ["setuptools>=68.0"]
