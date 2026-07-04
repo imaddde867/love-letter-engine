@@ -25,6 +25,7 @@ class Player:
     hand_card: Optional[CardType] = None
     favor_tokens: int = 0
     cards_played: list[CardType] = field(default_factory=list)
+    protected_until_next_turn: bool = False
 
     def eliminate(self) -> None:
         """Remove this player from the current round."""

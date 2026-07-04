@@ -169,6 +169,10 @@ class Engine:
         """
         player = state.players[player_id]
 
+        # Clear Handmaid protection at the start of the player's turn
+        if player.protected_until_next_turn:
+            player.protected_until_next_turn = False
+
         # Step 1: Draw a card from the deck
         if state.deck:
             drawn_card = state.deck.pop(0)
@@ -293,6 +297,16 @@ class Engine:
         # Award favor tokens to winners
         for winner in winners:
             winner.add_favor()
+
+        # Award Spy bonus: if only one active player played a Spy, give them extra favor
+        from love_letter.models.card import CardType
+
+        spy_players = [
+            p for p in active_players
+            if CardType.SPY in p.cards_played
+        ]
+        if len(spy_players) == 1:
+            spy_players[0].add_favor()
 
         # Check if any player has reached the threshold
         # (Game over check happens in execute_action after this)
