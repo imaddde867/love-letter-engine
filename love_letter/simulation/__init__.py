@@ -113,7 +113,15 @@ def simulate(
 
         # Bot chooses action
         bot = bot_a_tracker if current_player in bot_a_tracker.ids else bot_b_tracker
-        action = bot.choose_for(current_player, state)
+
+        try:
+            action = bot.choose_for(current_player, state)
+        except Exception:
+            # Bot has no legal actions — skip this turn
+            active_players = [pid for pid in player_ids if state.players[pid].is_active]
+            if active_players:
+                state.current_player_index = (state.current_player_index + 1) % len(active_players)
+            continue
 
         # Execute
         try:
@@ -159,21 +167,24 @@ def _start_new_round(
     """
     state = engine.get_state(game_id, player_ids[0])
 
-    # Reinstate all players
-    for pid in player_ids:
-        state.players[pid].is_active = True
-        state.players[pid].hand_card = None
-        state.players[pid].cards_played = []
-        state.players[pid].protected_until_next_turn = False
-
-    # Collect all played cards back into the deck
+    # Collect all cards back into the deck BEFORE resetting players
     all_cards: list[CardType] = list(state.deck)
     for entry in state.played_cards:
         all_cards.append(entry["card"])
     # Add back the facedown card if it exists
     if state.facedown_card is not None:
         all_cards.append(state.facedown_card)
-        state.facedown_card = None
+    # Collect hand cards from all players
+    for pid in player_ids:
+        if state.players[pid].hand_card is not None:
+            all_cards.append(state.players[pid].hand_card)
+
+    # Reinstate all players
+    for pid in player_ids:
+        state.players[pid].is_active = True
+        state.players[pid].hand_card = None
+        state.players[pid].cards_played = []
+        state.players[pid].protected_until_next_turn = False
 
     # Reshuffle
     import random

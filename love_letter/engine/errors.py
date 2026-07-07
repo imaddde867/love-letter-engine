@@ -165,7 +165,7 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
 
     # Guard-specific: guess required and cannot be GUARD
     if action.card_in_hand == CardType.GUARD:
-        if not action.guess:
+        if action.guess is None:
             violations.append(Violation(
                 field="guess",
                 message="Guard requires a guess (card type)",

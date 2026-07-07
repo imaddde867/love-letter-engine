@@ -191,12 +191,12 @@ class Engine:
                 ])
         else:
             if action.other_card is None:
-                # Princess discard: only card_in_hand matters
-                if action.card_in_hand != player.hand_card:
+                # Princess discard: card_in_hand must be one of the available cards
+                if action.card_in_hand not in expected_cards:
                     raise InvalidActionError([
                         Violation(
                             field="card_in_hand",
-                            message="Played card must be the player's hand card",
+                            message="Played card must be one of the available cards",
                             code="CARD_NOT_AVAILABLE",
                         )
                     ])
