@@ -20,7 +20,7 @@ def _state_to_dict(state: GameState, player_id: str) -> dict:
         player_state = {
             "id": pid,
             "is_active": player.is_active,
-            "hand_card": player.hand_card.value if player.hand_card else None,
+            "hand_card": player.hand_card.value if player.hand_card is not None else None,
             "favor_tokens": player.favor_tokens,
         }
         if pid == player_id:
