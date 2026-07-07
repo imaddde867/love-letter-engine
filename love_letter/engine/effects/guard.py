@@ -30,9 +30,9 @@ class GuardEffect:
         target_id = action.target_player
         guess = action.guess
 
-        if not target_id:
+        if target_id is None:
             raise ValueError("Guard requires a target_player")
-        if not guess:
+        if guess is None:
             raise ValueError("Guard requires a guess (card type)")
 
         target = state.players[target_id]

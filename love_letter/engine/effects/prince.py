@@ -29,7 +29,7 @@ class PrinceEffect:
         Raises:
             ValueError: If target_player is missing.
         """
-        if not action.target_player:
+        if action.target_player is None:
             raise ValueError("Prince requires a target_player")
 
         target = state.players[action.target_player]

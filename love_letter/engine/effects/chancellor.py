@@ -49,7 +49,10 @@ class ChancellorEffect:
             actor.hand_card = action.other_card
             return state
 
-        if action.other_card not in choices:
+        # Default to keeping the hand card when other_card is unspecified
+        kept_card = action.other_card if action.other_card is not None else choices[0]
+
+        if kept_card not in choices:
             raise InvalidActionError([
                 Violation(
                     field="other_card",
@@ -61,7 +64,7 @@ class ChancellorEffect:
         cards_to_return: list[CardType] = [CardType.CHANCELLOR]
         kept_card_removed = False
         for card in choices:
-            if not kept_card_removed and card == action.other_card:
+            if not kept_card_removed and card == kept_card:
                 kept_card_removed = True
                 continue
             cards_to_return.append(card)
@@ -69,5 +72,5 @@ class ChancellorEffect:
         for card in cards_to_return:
             state.deck.insert(0, card)  # Bottom of deck
 
-        actor.hand_card = action.other_card
+        actor.hand_card = kept_card
         return state

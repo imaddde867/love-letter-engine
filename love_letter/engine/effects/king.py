@@ -26,7 +26,7 @@ class KingEffect:
         Raises:
             ValueError: If target_player is missing.
         """
-        if not action.target_player:
+        if action.target_player is None:
             raise ValueError("King requires a target_player")
 
         actor = state.players[action.player_id]
