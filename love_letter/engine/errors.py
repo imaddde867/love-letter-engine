@@ -152,8 +152,8 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
             code="PLAYER_NOT_ACTIVE",
         ))
 
-    # Check card_in_hand is valid
-    if action.card_in_hand == CardType.PRINCESS and action.other_card is None:
+    # Princess must be discarded with other_card=None
+    if action.card_in_hand == CardType.PRINCESS and action.other_card is not None:
         violations.append(Violation(
             field="other_card",
             message="Princess discard requires other_card to be None",
@@ -165,7 +165,7 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
 
     # Guard-specific: guess required and cannot be GUARD
     if action.card_in_hand == CardType.GUARD:
-        if not action.guess:
+        if action.guess is None:
             violations.append(Violation(
                 field="guess",
                 message="Guard requires a guess (card type)",

@@ -74,7 +74,7 @@ def test_protection_clears_after_turn():
     action = Action(
         action_type="play_card",
         card_in_hand=CardType.PRINCESS,
-        other_card=CardType.COUNTESS,
+        other_card=None,
         player_id="alice",
     )
 
