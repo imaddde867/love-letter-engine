@@ -141,3 +141,25 @@ def test_available_actions_countess_with_king_pair():
     card_types = {a.card_in_hand for a in result}
     assert CardType.COUNTESS in card_types
     assert CardType.KING in card_types
+
+
+def test_available_actions_guard_generates_all_9_guesses():
+    """Guard actions include all 9 non-Guard card types as guesses."""
+    state = _make_state(CardType.GUARD, CardType.PRIEST)
+    result = available_actions(state, "alice")
+    guard_actions = [a for a in result if a.card_in_hand == CardType.GUARD]
+    guesses = {a.guess for a in guard_actions}
+    expected_guesses = {c for c in CardType if c != CardType.GUARD}
+    assert guesses == expected_guesses
+
+
+def test_available_actions_guard_guess_count_matches_targets_times_guesses():
+    """Guard generates len(targets) * 9 distinct actions (after dedup)."""
+    state = _make_state(CardType.GUARD, CardType.PRIEST)
+    result = available_actions(state, "alice")
+    guard_actions = [a for a in result if a.card_in_hand == CardType.GUARD]
+    targets = {a.target_player for a in guard_actions}
+    guesses = {a.guess for a in guard_actions}
+    assert len(targets) == 1  # bob is the only valid target
+    assert len(guesses) == 9  # all non-Guard card types
+    assert len(guard_actions) == 1 * 9

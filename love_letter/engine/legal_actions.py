@@ -94,16 +94,17 @@ def available_actions(state: GameState, player_id: str) -> list[Action]:
         for other in other_card_options:
             if card_in_hand in _TARGETING_CARDS:
                 for target in targets:
-                    guess = guesses[0] if card_in_hand == CardType.GUARD else None
-                    action = Action(
-                        action_type="play_card",
-                        card_in_hand=card_in_hand,
-                        other_card=other,
-                        player_id=player_id,
-                        target_player=target,
-                        guess=guess,
-                    )
-                    actions.append(action)
+                    guess_options = guesses if card_in_hand == CardType.GUARD else [None]
+                    for guess in guess_options:
+                        action = Action(
+                            action_type="play_card",
+                            card_in_hand=card_in_hand,
+                            other_card=other,
+                            player_id=player_id,
+                            target_player=target,
+                            guess=guess,
+                        )
+                        actions.append(action)
             else:
                 action = Action(
                     action_type="play_card",

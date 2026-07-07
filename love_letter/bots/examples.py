@@ -59,7 +59,7 @@ class GreedyBot(Player):
         score += card.value * 2
 
         # Guard: prefer guessing high-value cards against targets likely to hold them
-        if card == CardType.GUARD and action.guess:
+        if card == CardType.GUARD and action.guess is not None:
             score += action.guess.value
 
         # Prince: prefer targeting players with high-value cards
@@ -94,7 +94,7 @@ class SpyBot(Player):
 
         # Check if we have a Spy and haven't played it this round
         player = state.players[self._player_id]
-        has_spy = CardType.SPY in player.hand_card and CardType.SPY not in player.cards_played
+        has_spy = player.hand_card == CardType.SPY and CardType.SPY not in player.cards_played
 
         if has_spy:
             # Prioritize playing Spy
@@ -104,7 +104,6 @@ class SpyBot(Player):
 
         # Otherwise play greedy
         greedy = GreedyBot()
-        _saved = getattr(greedy, '_player_id', None)
         greedy.set_player_id(self._player_id)
         action = greedy.choose_action(state)
         return action
