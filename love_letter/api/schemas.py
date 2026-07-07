@@ -23,7 +23,7 @@ class ActionRequest(BaseModel):
     player_id: str
     action_type: str = "play_card"
     card_in_hand: CardType
-    other_card: CardType
+    other_card: Optional[CardType] = None
     target_player: Optional[str] = None
     guess: Optional[CardType] = None
 

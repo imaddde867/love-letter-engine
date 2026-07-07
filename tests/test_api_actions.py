@@ -98,3 +98,62 @@ def test_execute_action_on_invalid_action_returns_400():
     assert response.status_code == 400
     assert data["error"] == "invalid_action"
     assert data["violations"] == ["Guard requires a guess (card type)"]
+
+
+def test_action_request_accepts_missing_other_card():
+    """ActionRequest defaults other_card to None when omitted."""
+    req = ActionRequest(
+        player_id="alice",
+        card_in_hand=CardType.PRINCESS,
+    )
+    assert req.other_card is None
+
+
+def test_princess_discard_via_api_no_other_card():
+    """Princess discard works end-to-end without other_card in request."""
+    game_id, _ = _create_game()
+    state = engine.get_state(game_id, "alice")
+    state.players["alice"].hand_card = CardType.PRINCESS
+    state.deck = [CardType.GUARD, CardType.BARON]
+
+    new_state = _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="alice",
+            card_in_hand=CardType.PRINCESS,
+        ),
+    ))
+    assert new_state["game_id"] == game_id
+    alice = next(p for p in new_state["players"] if p["id"] == "alice")
+    assert alice["hand_card"] is None
+
+
+def test_chancellor_via_api_no_other_card():
+    """Chancellor works end-to-end without other_card in request."""
+    game_id, _ = _create_game()
+    state = engine.get_state(game_id, "alice")
+    state.players["alice"].hand_card = CardType.CHANCELLOR
+    state.deck = [CardType.GUARD, CardType.BARON]
+
+    new_state = _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="alice",
+            card_in_hand=CardType.CHANCELLOR,
+        ),
+    ))
+    assert new_state["game_id"] == game_id
+    alice = next(p for p in new_state["players"] if p["id"] == "alice")
+    assert alice["hand_card"] is not None
+
+
+def test_spy_serializes_as_zero_not_null():
+    """SPY (value 0) serializes as 0, not null, in _state_to_dict."""
+    game_id, _ = _create_game()
+    state = engine.get_state(game_id, "alice")
+    state.players["alice"].hand_card = CardType.SPY
+    state.deck = [CardType.GUARD, CardType.BARON]
+
+    response = _run(get_state(game_id, player_id="alice"))
+    alice = next(p for p in response["players"] if p["id"] == "alice")
+    assert alice["hand_card"] == 0
