@@ -160,6 +160,14 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
             code="INVALID_OTHER_CARD",
         ))
 
+    # Non-Princess/Chancellor cards must provide other_card (they play one, keep one)
+    if action.card_in_hand not in (CardType.PRINCESS, CardType.CHANCELLOR) and action.other_card is None:
+        violations.append(Violation(
+            field="other_card",
+            message=f"{action.card_in_hand.name} requires other_card to be set",
+            code="MISSING_OTHER_CARD",
+        ))
+
     # Targeting cards require a valid target_player
     _validate_target(action, state, violations)
 

@@ -197,3 +197,96 @@ def test_validate_action_valid_guard_action():
     state = _make_state()
     violations = validate_action(action, "alice", state)
     assert violations == []
+
+
+def test_validate_action_rejects_guard_other_card_none():
+    """Guard with other_card=None is invalid — only Princess/Chancellor allow it."""
+    action = _make_action(card_in_hand=CardType.GUARD, other_card=None, guess=CardType.PRIEST)
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_OTHER_CARD" in codes
+
+
+def test_validate_action_rejects_king_other_card_none():
+    """King with other_card=None is invalid."""
+    action = _make_action(
+        card_in_hand=CardType.KING, other_card=None, target_player="bob"
+    )
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_OTHER_CARD" in codes
+
+
+def test_validate_action_rejects_baron_other_card_none():
+    """Baron with other_card=None is invalid."""
+    action = _make_action(
+        card_in_hand=CardType.BARON, other_card=None, target_player="bob"
+    )
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_OTHER_CARD" in codes
+
+
+def test_validate_action_rejects_priest_other_card_none():
+    """Priest with other_card=None is invalid."""
+    action = _make_action(
+        card_in_hand=CardType.PRIEST, other_card=None, target_player="bob"
+    )
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_OTHER_CARD" in codes
+
+
+def test_validate_action_rejects_prince_other_card_none():
+    """Prince with other_card=None is invalid."""
+    action = _make_action(
+        card_in_hand=CardType.PRINCE, other_card=None, target_player="bob"
+    )
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_OTHER_CARD" in codes
+
+
+def test_validate_action_rejects_handmaid_other_card_none():
+    """Handmaid with other_card=None is invalid."""
+    action = _make_action(card_in_hand=CardType.HANDMAID, other_card=None)
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_OTHER_CARD" in codes
+
+
+def test_validate_action_rejects_countess_other_card_none():
+    """Countess with other_card=None is invalid."""
+    action = _make_action(card_in_hand=CardType.COUNTESS, other_card=None)
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_OTHER_CARD" in codes
+
+
+def test_validate_action_allows_princess_other_card_none():
+    """Princess with other_card=None is valid (princess discard)."""
+    action = _make_action(
+        card_in_hand=CardType.PRINCESS, other_card=None
+    )
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    other_card_violations = [v for v in violations if v.code == "MISSING_OTHER_CARD"]
+    assert other_card_violations == []
+
+
+def test_validate_action_allows_chancellor_other_card_none():
+    """Chancellor with other_card=None is valid (per ADR-009 simplification)."""
+    action = _make_action(
+        card_in_hand=CardType.CHANCELLOR, other_card=None
+    )
+    state = _make_state()
+    violations = validate_action(action, "alice", state)
+    other_card_violations = [v for v in violations if v.code == "MISSING_OTHER_CARD"]
+    assert other_card_violations == []
