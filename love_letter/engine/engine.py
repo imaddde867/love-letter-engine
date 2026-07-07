@@ -190,7 +190,7 @@ class Engine:
                     )
                 ])
         else:
-            if action.other_card is None:
+            if action.card_in_hand == CardType.PRINCESS and action.other_card is None:
                 # Princess discard: card_in_hand must be one of the available cards
                 if action.card_in_hand not in expected_cards:
                     raise InvalidActionError([
@@ -200,6 +200,14 @@ class Engine:
                             code="CARD_NOT_AVAILABLE",
                         )
                     ])
+            elif action.card_in_hand != CardType.PRINCESS and action.other_card is None:
+                raise InvalidActionError([
+                    Violation(
+                        field="other_card",
+                        message=f"{action.card_in_hand.name} requires other_card to be set",
+                        code="MISSING_OTHER_CARD",
+                    )
+                ])
             else:
                 submitted_cards = [action.card_in_hand, action.other_card]
                 if sorted(submitted_cards) != sorted(expected_cards):
