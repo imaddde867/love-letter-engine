@@ -123,18 +123,9 @@ def simulate(
         try:
             action = bot.choose_for(current_player, state)
         except Exception as e:
-            # Bot has no legal actions — skip this turn
-            result.rounds.append({
-                "round": round_num, "active_players": list(active_players),
-                "skipped": True, "player": current_player, "reason": str(e),
-            })
-            consecutive_skips[current_player] = consecutive_skips.get(current_player, 0) + 1
-            if consecutive_skips[current_player] >= CONSECUTIVE_SKIP_LIMIT:
-                result.error = f"Player {current_player} skipped {CONSECUTIVE_SKIP_LIMIT} consecutive turns"
+            if _handle_skip(result, consecutive_skips, round_num, active_players, current_player, e):
                 break
-            active_players = [pid for pid in player_ids if state.players[pid].is_active]
-            if active_players:
-                state.current_player_index = (state.current_player_index + 1) % len(active_players)
+            state.current_player_index = (state.current_player_index + 1) % len(active_players)
             continue
 
         # Execute
@@ -142,18 +133,9 @@ def simulate(
             state = engine.execute_action(game_id, current_player, action)
             consecutive_skips[current_player] = 0
         except Exception as e:
-            # Invalid action from bot — skip this turn
-            result.rounds.append({
-                "round": round_num, "active_players": list(active_players),
-                "skipped": True, "player": current_player, "reason": str(e),
-            })
-            consecutive_skips[current_player] = consecutive_skips.get(current_player, 0) + 1
-            if consecutive_skips[current_player] >= CONSECUTIVE_SKIP_LIMIT:
-                result.error = f"Player {current_player} skipped {CONSECUTIVE_SKIP_LIMIT} consecutive turns"
+            if _handle_skip(result, consecutive_skips, round_num, active_players, current_player, e):
                 break
-            active_players = [pid for pid in player_ids if state.players[pid].is_active]
-            if active_players:
-                state.current_player_index = (state.current_player_index + 1) % len(active_players)
+            state.current_player_index = (state.current_player_index + 1) % len(active_players)
             continue
 
     # Collect final standings
@@ -164,6 +146,29 @@ def simulate(
     result.total_rounds = round_num
 
     return result
+
+
+def _handle_skip(
+    result: SimulationResult,
+    consecutive_skips: dict[str, int],
+    round_num: int,
+    active_players: list[str],
+    player: str,
+    exc: Exception,
+) -> bool:
+    """Record a skipped turn and check the consecutive limit.
+
+    Returns True if the simulation should terminate (limit exceeded).
+    """
+    result.rounds.append({
+        "round": round_num, "active_players": list(active_players),
+        "skipped": True, "player": player, "reason": str(exc),
+    })
+    consecutive_skips[player] = consecutive_skips.get(player, 0) + 1
+    if consecutive_skips[player] >= CONSECUTIVE_SKIP_LIMIT:
+        result.error = f"Player {player} skipped {CONSECUTIVE_SKIP_LIMIT} consecutive turns"
+        return True
+    return False
 
 
 class _PlayerTracker:
