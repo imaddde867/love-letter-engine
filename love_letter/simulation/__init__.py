@@ -17,6 +17,9 @@ from love_letter.models.card import CardType
 from love_letter.models.state import GameState
 
 
+CONSECUTIVE_SKIP_LIMIT = 10
+
+
 @dataclass
 class SimulationResult:
     """Outcome of a simulated game.
@@ -26,12 +29,14 @@ class SimulationResult:
         rounds: Round-by-round log entries.
         final_standings: Final favor token counts for all players.
         total_rounds: Number of rounds played.
+        error: Set to a message if the simulation terminated abnormally.
     """
 
     winner_id: str
     rounds: list[dict] = field(default_factory=list)
     final_standings: dict[str, int] = field(default_factory=dict)
     total_rounds: int = 0
+    error: str | None = None
 
 
 def simulate(
@@ -71,6 +76,7 @@ def simulate(
 
     result = SimulationResult(winner_id="", rounds=[], final_standings={})
     round_num = 0
+    consecutive_skips: dict[str, int] = {}
 
     while True:
         state = engine.get_state(game_id, player_ids[0])
@@ -116,8 +122,16 @@ def simulate(
 
         try:
             action = bot.choose_for(current_player, state)
-        except Exception:
+        except Exception as e:
             # Bot has no legal actions — skip this turn
+            result.rounds.append({
+                "round": round_num, "active_players": list(active_players),
+                "skipped": True, "player": current_player, "reason": str(e),
+            })
+            consecutive_skips[current_player] = consecutive_skips.get(current_player, 0) + 1
+            if consecutive_skips[current_player] >= CONSECUTIVE_SKIP_LIMIT:
+                result.error = f"Player {current_player} skipped {CONSECUTIVE_SKIP_LIMIT} consecutive turns"
+                break
             active_players = [pid for pid in player_ids if state.players[pid].is_active]
             if active_players:
                 state.current_player_index = (state.current_player_index + 1) % len(active_players)
@@ -126,8 +140,17 @@ def simulate(
         # Execute
         try:
             state = engine.execute_action(game_id, current_player, action)
-        except Exception:
+            consecutive_skips[current_player] = 0
+        except Exception as e:
             # Invalid action from bot — skip this turn
+            result.rounds.append({
+                "round": round_num, "active_players": list(active_players),
+                "skipped": True, "player": current_player, "reason": str(e),
+            })
+            consecutive_skips[current_player] = consecutive_skips.get(current_player, 0) + 1
+            if consecutive_skips[current_player] >= CONSECUTIVE_SKIP_LIMIT:
+                result.error = f"Player {current_player} skipped {CONSECUTIVE_SKIP_LIMIT} consecutive turns"
+                break
             active_players = [pid for pid in player_ids if state.players[pid].is_active]
             if active_players:
                 state.current_player_index = (state.current_player_index + 1) % len(active_players)
