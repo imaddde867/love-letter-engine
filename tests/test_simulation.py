@@ -19,6 +19,13 @@ class _AlwaysPrincessBot:
         )
 
 
+class _AlwaysRaisesBot:
+    """Bot that always raises an exception on choose_action."""
+
+    def choose_action(self, state) -> Action:
+        raise RuntimeError("bot always fails")
+
+
 def test_simulation_result_has_winner():
     """SimulationResult stores the winner's ID."""
     result = SimulationResult(
@@ -106,3 +113,37 @@ def test_simulate_with_always_princess_bot_loses_fast():
     # giving p1 favor tokens. It may still win rounds when it doesn't hold it.
     assert len(result.rounds) > 0
     assert result.winner_id is not None
+
+
+def test_skipped_turns_recorded_in_rounds():
+    """A bot that always raises produces skipped-turn entries in rounds."""
+    bot_raises = _AlwaysRaisesBot()
+    bot_random = RandomBot()
+
+    result = simulate(bot_raises, bot_random, player_count=2)
+
+    skipped = [r for r in result.rounds if r.get("skipped")]
+    assert len(skipped) > 0, "expected at least one skipped turn entry"
+    for entry in skipped:
+        assert "round" in entry
+        assert "active_players" in entry
+        assert "player" in entry
+        assert "reason" in entry
+        assert entry["skipped"] is True
+
+
+def test_consecutive_skip_limit_terminates_simulation():
+    """Simulation terminates when the same player hits the consecutive skip limit."""
+    bot_raises = _AlwaysRaisesBot()
+
+    result = simulate(bot_raises, bot_raises, player_count=2)
+
+    # Must terminate — not hang forever
+    assert result.error is not None, "expected error field to be set on abnormal termination"
+    assert "skip" in result.error.lower()
+
+
+def test_simulation_result_has_error_field():
+    """SimulationResult has an error field that defaults to None."""
+    result = SimulationResult(winner_id="p0")
+    assert result.error is None
