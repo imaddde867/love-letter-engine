@@ -1,10 +1,13 @@
 """Tests for the bot-vs-bot simulator."""
 
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from love_letter.bots import Player
 from love_letter.bots.examples import RandomBot
 from love_letter.models.action import Action
 from love_letter.models.card import CardType
-from love_letter.simulation import SimulationResult, simulate
+from love_letter.simulation import CONSECUTIVE_SKIP_LIMIT, SimulationResult, simulate
 
 
 class _AlwaysPrincessBot:
@@ -147,3 +150,15 @@ def test_simulation_result_has_error_field():
     """SimulationResult has an error field that defaults to None."""
     result = SimulationResult(winner_id="p0")
     assert result.error is None
+
+
+@given(player_count=st.integers(min_value=2, max_value=6))
+@settings(max_examples=50)
+def test_always_raises_bot_terminates_bounded(player_count):
+    """Simulation with always-raises bots always terminates within bounded turns."""
+    bot = _AlwaysRaisesBot()
+
+    result = simulate(bot, bot, player_count=player_count)
+
+    assert result.error is not None
+    assert len(result.rounds) <= CONSECUTIVE_SKIP_LIMIT * player_count + 1
