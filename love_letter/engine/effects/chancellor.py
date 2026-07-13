@@ -61,7 +61,7 @@ class ChancellorEffect:
                 )
             ])
 
-        cards_to_return: list[CardType] = [CardType.CHANCELLOR]
+        cards_to_return: list[CardType] = []
         kept_card_removed = False
         for card in choices:
             if not kept_card_removed and card == kept_card:
