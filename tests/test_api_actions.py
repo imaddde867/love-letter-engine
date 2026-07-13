@@ -76,6 +76,46 @@ def test_execute_action_with_invalid_card_fails_validation():
         )
 
 
+def test_execute_action_on_unknown_game_returns_404():
+    """POST /actions with unknown game_id returns 404, not 400."""
+    with pytest.raises(HTTPException) as exc_info:
+        _run(execute_action(
+            "nonexistent-game",
+            ActionRequest(
+                player_id="alice",
+                action_type="play_card",
+                card_in_hand=CardType.GUARD,
+                other_card=CardType.PRIEST,
+            ),
+        ))
+
+    assert exc_info.value.status_code == 404
+
+
+def test_execute_action_on_finished_game_returns_409():
+    """POST /actions on a game that already reached the favor threshold returns 409."""
+    game_id, _ = _create_game()
+    state = engine.get_state(game_id, "alice")
+    state.players["alice"].favor_tokens = state.favor_token_threshold
+    state.players["alice"].hand_card = CardType.GUARD
+    state.deck = [CardType.PRIEST, CardType.BARON]
+
+    with pytest.raises(HTTPException) as exc_info:
+        _run(execute_action(
+            game_id,
+            ActionRequest(
+                player_id="alice",
+                action_type="play_card",
+                card_in_hand=CardType.GUARD,
+                other_card=CardType.PRIEST,
+                target_player="bob",
+                guess=CardType.PRIEST,
+            ),
+        ))
+
+    assert exc_info.value.status_code == 409
+
+
 def test_execute_action_on_invalid_action_returns_400():
     """POST /actions returns structured validation errors."""
     game_id, _ = _create_game()

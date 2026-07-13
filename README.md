@@ -15,6 +15,9 @@ A robust, clean backend engine for the Love Letter card game.
 # Run a test game
 python -m love_letter test
 
+# Run a test game with specific bots (random, greedy, spy)
+python -m love_letter test --bots random greedy
+
 # Start API server
 python -m love_letter serve
 
@@ -49,10 +52,7 @@ Interactive docs: `http://localhost:8000/docs`
 pip install -e ".[dev]"
 
 # Run tests with coverage
-pytest --cov=love_letter/engine tests/
-
-# Type checking
-mypy love_letter/
+pytest --cov=love_letter tests/
 ```
 
 ## Documentation
