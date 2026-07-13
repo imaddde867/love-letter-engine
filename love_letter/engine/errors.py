@@ -55,19 +55,6 @@ class InvalidActionError(Exception):
         """
         self.violations.append(violation)
 
-    @classmethod
-    def from_violations(cls, violations: list[Violation]) -> "InvalidActionError":
-        """Create an InvalidActionError from a list of violations.
-
-        Args:
-            violations: List of Violation objects.
-
-        Returns:
-            A new InvalidActionError instance.
-        """
-        error = cls(violations)
-        return error
-
 
 class GameNotFoundError(Exception):
     """Raised when a game ID is not found."""
@@ -199,17 +186,9 @@ def _validate_target(action: Any, state: Any, violations: list[Violation]) -> No
         state: The current game state.
         violations: Mutable list of Violations to append to.
     """
-    from love_letter.models.card import CardType
+    from love_letter.engine.legal_actions import _TARGETING_CARDS
 
-    targeting_cards = {
-        CardType.GUARD,
-        CardType.PRIEST,
-        CardType.BARON,
-        CardType.PRINCE,
-        CardType.KING,
-    }
-
-    if action.card_in_hand not in targeting_cards:
+    if action.card_in_hand not in _TARGETING_CARDS:
         return
 
     target_id = action.target_player

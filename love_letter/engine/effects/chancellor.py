@@ -33,12 +33,10 @@ class ChancellorEffect:
         # Draw 2 cards (or fewer if deck is short)
         drawn: list[CardType] = []
         for _ in range(2):
-            if state.deck:
-                drawn.append(state.deck.pop(0))
-            elif state.facedown_card is not None:
-                drawn.append(state.facedown_card)
-                state.facedown_card = None
+            card = state.draw_card()
+            if card is None:
                 break
+            drawn.append(card)
 
         choices = []
         if actor.hand_card is not None and actor.hand_card != CardType.CHANCELLOR:
@@ -61,13 +59,8 @@ class ChancellorEffect:
                 )
             ])
 
-        cards_to_return: list[CardType] = [CardType.CHANCELLOR]
-        kept_card_removed = False
-        for card in choices:
-            if not kept_card_removed and card == kept_card:
-                kept_card_removed = True
-                continue
-            cards_to_return.append(card)
+        cards_to_return = list(choices)
+        cards_to_return.remove(kept_card)
 
         for card in cards_to_return:
             state.deck.insert(0, card)  # Bottom of deck

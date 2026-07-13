@@ -48,10 +48,6 @@ class PrinceEffect:
             return state
 
         # Redraw from deck or facedown
-        if state.deck:
-            target.hand_card = state.deck.pop(0)
-        elif state.facedown_card is not None:
-            target.hand_card = state.facedown_card
-            state.facedown_card = None
+        target.hand_card = state.draw_card()
 
         return state
