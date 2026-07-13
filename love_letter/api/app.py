@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from love_letter.api.schemas import ActionRequest, CreateGameRequest
 from love_letter.engine.engine import Engine
+from love_letter.engine.errors import GameOverError
 from love_letter.models.action import Action
 from love_letter.models.state import GameState
 
@@ -88,12 +89,23 @@ async def get_state(game_id: str, player_id: str = Query(...)):
 @app.post("/games/{game_id}/actions")
 async def execute_action(game_id: str, request: ActionRequest):
     """Execute an action for a player in a game."""
-    try:
-        # Convert ActionRequest to internal Action
-        action = Action.model_validate(request, from_attributes=True)
+    action = Action.model_validate(request, from_attributes=True)
 
+    try:
         state = engine.execute_action(game_id, request.player_id, action)
         return _state_to_dict(state, request.player_id)
+
+    except KeyError as e:
+        message = str(e).strip('"')
+        if message.startswith("Game "):
+            raise HTTPException(status_code=404, detail=message)
+        raise HTTPException(status_code=400, detail=message)
+
+    except GameOverError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "game_over", "message": str(e)},
+        )
 
     except Exception as e:
         # Return structured error for API consumers

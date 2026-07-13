@@ -246,13 +246,13 @@ pytest --cov=love_letter/engine tests/
 
 ## Success Criteria
 
-- [ ] All 21 card effects implemented and tested
-- [ ] Property tests pass for all game invariants
-- [ ] API endpoints work with curl
-- [ ] Bot-vs-bot simulation runs full games
-- [ ] Error handling returns specific violations
-- [ ] Documentation complete (docstrings + README)
-- [ ] Code is clean, minimal, and well-organized
+- [x] All 21 card effects implemented and tested
+- [x] Property tests pass for all game invariants
+- [x] API endpoints work with curl
+- [x] Bot-vs-bot simulation runs full games
+- [x] Error handling returns specific violations
+- [x] Documentation complete (docstrings + README)
+- [x] Code is clean, minimal, and well-organized
 
 ## Next Steps
 
