@@ -30,6 +30,20 @@ from love_letter.engine.errors import (
 )
 
 
+_EFFECT_MAP: dict[CardType, type] = {
+    CardType.GUARD: GuardEffect,
+    CardType.PRIEST: PriestEffect,
+    CardType.BARON: BaronEffect,
+    CardType.HANDMAID: HandmaidEffect,
+    CardType.PRINCE: PrinceEffect,
+    CardType.CHANCELLOR: ChancellorEffect,
+    CardType.KING: KingEffect,
+    CardType.COUNTESS: CountessEffect,
+    CardType.PRINCESS: PrincessEffect,
+    CardType.SPY: SpyEffect,
+}
+
+
 class Engine:
     """Manages multiple concurrent Love Letter games in memory.
 
@@ -220,13 +234,8 @@ class Engine:
                     ])
 
         # Step 1: Draw a card from the deck
-        if state.deck:
-            drawn_card = state.deck.pop(0)
-        elif state.facedown_card is not None:
-            # Deck empty, draw from facedown
-            drawn_card = state.facedown_card
-            state.facedown_card = None
-        else:
+        drawn_card = state.draw_card()
+        if drawn_card is None:
             # No cards left, round should have ended
             return state
 
@@ -288,20 +297,7 @@ class Engine:
         """
         card = action.card_in_hand
 
-        effect_map: dict[CardType, type] = {
-            CardType.GUARD: GuardEffect,
-            CardType.PRIEST: PriestEffect,
-            CardType.BARON: BaronEffect,
-            CardType.HANDMAID: HandmaidEffect,
-            CardType.PRINCE: PrinceEffect,
-            CardType.CHANCELLOR: ChancellorEffect,
-            CardType.KING: KingEffect,
-            CardType.COUNTESS: CountessEffect,
-            CardType.PRINCESS: PrincessEffect,
-            CardType.SPY: SpyEffect,
-        }
-
-        effect_cls = effect_map.get(card)
+        effect_cls = _EFFECT_MAP.get(card)
         if effect_cls is None:
             raise ValueError(f"Unknown card type: {card}")
 

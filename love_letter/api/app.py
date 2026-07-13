@@ -13,6 +13,11 @@ from love_letter.models.state import GameState
 engine = Engine()
 
 
+def _card_value(card):
+    """Return the card's value, or None if there is no card."""
+    return card.value if card is not None else None
+
+
 def _state_to_dict(state: GameState, player_id: str) -> dict:
     """Convert GameState to a JSON-serializable dict for the API response."""
     players = []
@@ -20,14 +25,12 @@ def _state_to_dict(state: GameState, player_id: str) -> dict:
         player_state = {
             "id": pid,
             "is_active": player.is_active,
-            "hand_card": player.hand_card.value if player.hand_card is not None else None,
+            "hand_card": _card_value(player.hand_card),
             "favor_tokens": player.favor_tokens,
         }
         if pid == player_id:
-            player_state["drawn_card"] = (
-                state.deck[0].value
-                if state.deck
-                else state.facedown_card.value if state.facedown_card else None
+            player_state["drawn_card"] = _card_value(
+                state.deck[0] if state.deck else state.facedown_card
             )
         players.append(player_state)
 
@@ -87,14 +90,7 @@ async def execute_action(game_id: str, request: ActionRequest):
     """Execute an action for a player in a game."""
     try:
         # Convert ActionRequest to internal Action
-        action = Action(
-            action_type=request.action_type,
-            card_in_hand=request.card_in_hand,
-            other_card=request.other_card,
-            player_id=request.player_id,
-            target_player=request.target_player,
-            guess=request.guess,
-        )
+        action = Action.model_validate(request, from_attributes=True)
 
         state = engine.execute_action(game_id, request.player_id, action)
         return _state_to_dict(state, request.player_id)

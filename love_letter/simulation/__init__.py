@@ -6,6 +6,7 @@ result with round-by-round logs.
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -80,8 +81,9 @@ def simulate(
 
     while True:
         state = engine.get_state(game_id, player_ids[0])
+        game_over = engine._is_game_over(state)
 
-        if engine._is_game_over(state):
+        if game_over:
             # Find the winner
             threshold = state.favor_token_threshold
             for pid in player_ids:
@@ -100,10 +102,6 @@ def simulate(
             }
             result.rounds.append(round_data)
             round_num += 1
-
-            # Start new round if game not over
-            if engine._is_game_over(state):
-                break
 
             # Reset for new round: redraw decks, reinstate players
             state = _start_new_round(engine, game_id, player_ids)
@@ -215,7 +213,6 @@ def _start_new_round(
         state.players[pid].protected_until_next_turn = False
 
     # Reshuffle
-    import random
     random.shuffle(all_cards)
 
     state.deck = all_cards

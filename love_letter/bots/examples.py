@@ -18,13 +18,18 @@ from love_letter.models.card import CardType
 from love_letter.models.state import GameState
 
 
+def _require_actions(actions: list[Action], player_id: str) -> None:
+    """Raise if the bot has no legal actions to choose from."""
+    if not actions:
+        raise RuntimeError(f"No legal actions for {player_id}")
+
+
 class RandomBot(Player):
     """Pick any legal action uniformly at random."""
 
     def choose_action(self, state: GameState) -> Action:
         actions = available_actions(state, self._player_id)
-        if not actions:
-            raise RuntimeError(f"No legal actions for {self._player_id}")
+        _require_actions(actions, self._player_id)
         return random.choice(actions)
 
     def set_player_id(self, player_id: str) -> None:
@@ -36,8 +41,7 @@ class GreedyBot(Player):
 
     def choose_action(self, state: GameState) -> Action:
         actions = available_actions(state, self._player_id)
-        if not actions:
-            raise RuntimeError(f"No legal actions for {self._player_id}")
+        _require_actions(actions, self._player_id)
 
         # Score each action
         scored: list[tuple[int, Action]] = []
@@ -89,8 +93,7 @@ class SpyBot(Player):
 
     def choose_action(self, state: GameState) -> Action:
         actions = available_actions(state, self._player_id)
-        if not actions:
-            raise RuntimeError(f"No legal actions for {self._player_id}")
+        _require_actions(actions, self._player_id)
 
         # Check if we have a Spy and haven't played it this round
         player = state.players[self._player_id]
