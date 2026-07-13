@@ -37,3 +37,17 @@ class GameState:
     def deck_count(self) -> int:
         """Number of cards remaining in the deck."""
         return len(self.deck)
+
+    def draw_card(self) -> Optional[CardType]:
+        """Draw the next card: from the deck, falling back to the facedown card.
+
+        Returns:
+            The drawn card, or None if both deck and facedown card are empty.
+        """
+        if self.deck:
+            return self.deck.pop(0)
+        if self.facedown_card is not None:
+            card = self.facedown_card
+            self.facedown_card = None
+            return card
+        return None
