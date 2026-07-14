@@ -43,6 +43,18 @@ class PrinceEffect:
         discarded_card = target.hand_card
         target.hand_card = None
 
+        # Record the forced discard in the public pile — otherwise this
+        # card vanishes from the game entirely once the round rebuilds the
+        # deck from played_cards, hands, and the facedown card.
+        if discarded_card is not None:
+            state.played_cards.append(
+                {
+                    "player_id": action.target_player,
+                    "card": discarded_card,
+                    "target_player": None,
+                }
+            )
+
         # If they discarded the Princess, they are eliminated and don't redraw
         if discarded_card == CardType.PRINCESS:
             target.eliminate()
