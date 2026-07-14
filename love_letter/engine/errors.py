@@ -138,6 +138,12 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
             message=f"Player {player_id} is eliminated",
             code="PLAYER_NOT_ACTIVE",
         ))
+    elif player_id != state.current_player_id:
+        violations.append(Violation(
+            field="player_id",
+            message=f"It is not {player_id}'s turn",
+            code="NOT_PLAYER_TURN",
+        ))
 
     # Princess must be discarded with other_card=None
     if action.card_in_hand == CardType.PRINCESS and action.other_card is not None:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -18,14 +16,6 @@ from love_letter.models.state import GameState
 engine = Engine()
 
 
-def _current_player_id(state: GameState) -> Optional[str]:
-    """Return the ID of the player whose turn it is, or None if nobody is active."""
-    active_players = [pid for pid, p in state.players.items() if p.is_active]
-    if not active_players:
-        return None
-    return active_players[state.current_player_index % len(active_players)]
-
-
 def _card_value(card):
     """Return the card's value, or None if there is no card."""
     return card.value if card is not None else None
@@ -33,7 +23,7 @@ def _card_value(card):
 
 def _state_to_dict(state: GameState, player_id: str) -> dict:
     """Convert GameState to a JSON-serializable dict for the API response."""
-    current_player_id = _current_player_id(state)
+    current_player_id = state.current_player_id
     players = []
     for pid, player in state.players.items():
         # Hand cards are hidden except to their own player. Eliminated
@@ -70,7 +60,7 @@ def _state_to_dict(state: GameState, player_id: str) -> dict:
         "favor_token_threshold": state.favor_token_threshold,
         "players": players,
         "current_player_index": state.current_player_index,
-        "current_player_id": _current_player_id(state),
+        "current_player_id": state.current_player_id,
         "played_cards": played_cards,
         "your_id": player_id,
     }
@@ -122,6 +112,9 @@ async def get_legal_actions(game_id: str, player_id: str = Query(...)):
         state = engine.get_state(game_id, player_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Game not found")
+
+    if player_id != state.current_player_id:
+        return []
 
     return [action.model_dump() for action in available_actions(state, player_id)]
 
