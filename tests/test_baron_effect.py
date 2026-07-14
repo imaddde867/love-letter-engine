@@ -67,8 +67,8 @@ def test_baron_tie_no_effect():
     assert state.players["bob"].is_active is True
 
 
-def test_baron_requires_target():
-    """Baron without target raises ValueError."""
+def test_baron_without_target_is_a_no_op():
+    """Baron with no target_player (no valid targets) has no effect."""
     state = GameState(game_id="g1", round=1)
     action = Action(
         action_type="play_card",
@@ -77,8 +77,5 @@ def test_baron_requires_target():
         other_card=CardType.GUARD,
     )
 
-    try:
-        BaronEffect.resolve(state, action)
-        assert False, "Should have raised ValueError"
-    except ValueError as e:
-        assert "target_player" in str(e).lower()
+    result = BaronEffect.resolve(state, action)
+    assert result is state

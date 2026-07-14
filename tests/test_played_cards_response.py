@@ -116,6 +116,9 @@ def test_played_cards_include_target_player_when_present():
     """played_cards entries include target_player to match the PLAN contract."""
     game_id = _create_game()
     _set_turn_cards(game_id, "alice", CardType.GUARD, CardType.PRIEST)
+    # Guess deliberately wrong so bob survives — a correct guess would
+    # eliminate him, end the round, and reset played_cards for round 2.
+    engine.get_state(game_id, "bob").players["bob"].hand_card = CardType.KING
 
     response = _run(execute_action(
         game_id,

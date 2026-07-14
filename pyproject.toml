@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A robust backend engine for Love Letter card game."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["httpx>=0.27,<0.28"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "hypothesis>=6.0"]
@@ -12,7 +12,6 @@ test = [
     "pytest>=8.0",
     "hypothesis>=6.0",
     "fastapi>=0.115,<0.116",
-    "httpx>=0.27,<0.28",
     "uvicorn>=0.30,<0.31",
     "anyio>=4.8,<4.10",
 ]

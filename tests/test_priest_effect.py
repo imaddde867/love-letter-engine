@@ -7,8 +7,8 @@ from love_letter.models.player import Player
 from love_letter.models.state import GameState
 
 
-def test_priest_requires_target():
-    """Priest without target raises ValueError."""
+def test_priest_without_target_is_a_no_op():
+    """Priest with no target_player (no valid targets) has no effect."""
     state = GameState(game_id="g1", round=1)
     action = Action(
         action_type="play_card",
@@ -17,11 +17,8 @@ def test_priest_requires_target():
         other_card=CardType.BARON,
     )
 
-    try:
-        PriestEffect.resolve(state, action)
-        assert False, "Should have raised ValueError"
-    except ValueError as e:
-        assert "target_player" in str(e).lower()
+    result = PriestEffect.resolve(state, action)
+    assert result is state
 
 
 def test_priest_does_not_change_state():
