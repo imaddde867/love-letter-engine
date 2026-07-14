@@ -11,13 +11,17 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def _bearer(token: str) -> str:
+    return f"Bearer {token}"
+
+
 def test_full_game_flow():
     """Test creating a game, getting state, and executing actions."""
     created = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
     game_id = created["game_id"]
     tokens = created["tokens"]
 
-    state = _run(get_state(game_id, player_id="alice", token=tokens["alice"]))
+    state = _run(get_state(game_id, player_id="alice", authorization=_bearer(tokens["alice"])))
     assert state["game_id"] == game_id
     assert len(state["players"]) == 2
     assert state["round"] == 1
@@ -30,15 +34,15 @@ def test_full_game_flow():
         game_id,
         ActionRequest(
             player_id="alice",
-            token=tokens["alice"],
             action_type="play_card",
             card_in_hand=CardType.HANDMAID,
             other_card=CardType.PRINCESS,
         ),
+        authorization=_bearer(tokens["alice"]),
     ))
     assert new_state["round"] == 1
 
-    bob_state = _run(get_state(game_id, player_id="bob", token=tokens["bob"]))
+    bob_state = _run(get_state(game_id, player_id="bob", authorization=_bearer(tokens["bob"])))
     assert len(bob_state["players"]) == 2
 
 
@@ -47,5 +51,7 @@ def test_game_over_after_threshold():
     created = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
     game_id = created["game_id"]
 
-    state = _run(get_state(game_id, player_id="alice", token=created["tokens"]["alice"]))
+    state = _run(
+        get_state(game_id, player_id="alice", authorization=_bearer(created["tokens"]["alice"]))
+    )
     assert state["favor_token_threshold"] == 6

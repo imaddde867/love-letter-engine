@@ -22,13 +22,17 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def _bearer(token: str) -> str:
+    return f"Bearer {token}"
+
+
 def _create_game(player_ids: list[str] | None = None) -> tuple[str, dict, dict]:
     """Helper to create a game and return (game_id, state, tokens)."""
     player_ids = player_ids or ["alice", "bob"]
     created = _run(create_game(CreateGameRequest(player_ids=player_ids)))
     game_id = created["game_id"]
     tokens = created["tokens"]
-    state = _run(get_state(game_id, player_id="alice", token=tokens["alice"]))
+    state = _run(get_state(game_id, player_id="alice", authorization=_bearer(tokens["alice"])))
     return game_id, state, tokens
 
 
@@ -47,11 +51,11 @@ def test_execute_action_returns_updated_state():
         game_id,
         ActionRequest(
             player_id="alice",
-            token=tokens["alice"],
             action_type="play_card",
             card_in_hand=CardType.HANDMAID,
             other_card=CardType.PRINCESS,
         ),
+        authorization=_bearer(tokens["alice"]),
     ))
     assert new_state["game_id"] == game_id
 
@@ -65,11 +69,11 @@ def test_execute_action_with_unknown_player_returns_400():
             game_id,
             ActionRequest(
                 player_id="unknown",
-                token="irrelevant",
                 action_type="play_card",
                 card_in_hand=CardType.GUARD,
                 other_card=CardType.PRIEST,
             ),
+            authorization=_bearer("irrelevant"),
         ))
 
     assert exc_info.value.status_code == 400
@@ -93,11 +97,11 @@ def test_execute_action_with_wrong_token_is_rejected():
             game_id,
             ActionRequest(
                 player_id="bob",
-                token="not-bobs-token",
                 action_type="play_card",
                 card_in_hand=CardType.HANDMAID,
                 other_card=CardType.PRINCESS,
             ),
+            authorization=_bearer("not-bobs-token"),
         ))
 
     assert exc_info.value.status_code == 403
@@ -116,11 +120,11 @@ def test_execute_action_with_another_players_real_token_is_rejected():
             game_id,
             ActionRequest(
                 player_id="bob",
-                token=tokens["alice"],
                 action_type="play_card",
                 card_in_hand=CardType.HANDMAID,
                 other_card=CardType.PRINCESS,
             ),
+            authorization=_bearer(tokens["alice"]),
         ))
 
     assert exc_info.value.status_code == 403
@@ -131,7 +135,6 @@ def test_execute_action_with_invalid_card_fails_validation():
     with pytest.raises(ValidationError):
         ActionRequest(
             player_id="alice",
-            token="whatever",
             card_in_hand=99,
             other_card=2,
         )
@@ -144,11 +147,11 @@ def test_execute_action_on_unknown_game_returns_404():
             "nonexistent-game",
             ActionRequest(
                 player_id="alice",
-                token="whatever",
                 action_type="play_card",
                 card_in_hand=CardType.GUARD,
                 other_card=CardType.PRIEST,
             ),
+            authorization=_bearer("whatever"),
         ))
 
     assert exc_info.value.status_code == 404
@@ -167,13 +170,13 @@ def test_execute_action_on_finished_game_returns_409():
             game_id,
             ActionRequest(
                 player_id="alice",
-                token=tokens["alice"],
                 action_type="play_card",
                 card_in_hand=CardType.GUARD,
                 other_card=CardType.PRIEST,
                 target_player="bob",
                 guess=CardType.PRIEST,
             ),
+            authorization=_bearer(tokens["alice"]),
         ))
 
     assert exc_info.value.status_code == 409
@@ -190,13 +193,13 @@ def test_execute_action_on_invalid_action_returns_400():
         game_id,
         ActionRequest(
             player_id="alice",
-            token=tokens["alice"],
             action_type="play_card",
             card_in_hand=CardType.GUARD,
             other_card=CardType.PRIEST,
             target_player="bob",
             guess=None,
         ),
+        authorization=_bearer(tokens["alice"]),
     ))
     data = _response_json(response)
     assert response.status_code == 400
@@ -208,7 +211,6 @@ def test_action_request_accepts_missing_other_card():
     """ActionRequest defaults other_card to None when omitted."""
     req = ActionRequest(
         player_id="alice",
-        token="whatever",
         card_in_hand=CardType.PRINCESS,
     )
     assert req.other_card is None
@@ -230,9 +232,9 @@ def test_princess_discard_via_api_no_other_card():
         game_id,
         ActionRequest(
             player_id="alice",
-            token=tokens["alice"],
             card_in_hand=CardType.PRINCESS,
         ),
+        authorization=_bearer(tokens["alice"]),
     ))
     assert new_state["game_id"] == game_id
     alice = next(p for p in new_state["players"] if p["id"] == "alice")
@@ -250,9 +252,9 @@ def test_chancellor_via_api_no_other_card():
         game_id,
         ActionRequest(
             player_id="alice",
-            token=tokens["alice"],
             card_in_hand=CardType.CHANCELLOR,
         ),
+        authorization=_bearer(tokens["alice"]),
     ))
     assert new_state["game_id"] == game_id
     alice = next(p for p in new_state["players"] if p["id"] == "alice")
@@ -268,7 +270,9 @@ def test_get_legal_actions_off_turn_does_not_leak_draw_card():
     engine_state.players["bob"].hand_card = CardType.GUARD
     engine_state.deck = [CardType.PRINCESS]
 
-    actions = _run(get_legal_actions(game_id, player_id="bob", token=tokens["bob"]))
+    actions = _run(
+        get_legal_actions(game_id, player_id="bob", authorization=_bearer(tokens["bob"]))
+    )
     assert actions == []
 
 
@@ -285,11 +289,11 @@ def test_execute_action_off_turn_is_rejected():
         game_id,
         ActionRequest(
             player_id="bob",
-            token=tokens["bob"],
             action_type="play_card",
             card_in_hand=CardType.HANDMAID,
             other_card=CardType.PRINCESS,
         ),
+        authorization=_bearer(tokens["bob"]),
     ))
     data = _response_json(response)
     assert response.status_code == 400
@@ -305,6 +309,8 @@ def test_spy_serializes_as_zero_not_null():
     state.players["alice"].hand_card = CardType.SPY
     state.deck = [CardType.GUARD, CardType.BARON]
 
-    response = _run(get_state(game_id, player_id="alice", token=tokens["alice"]))
+    response = _run(
+        get_state(game_id, player_id="alice", authorization=_bearer(tokens["alice"]))
+    )
     alice = next(p for p in response["players"] if p["id"] == "alice")
     assert alice["hand_card"] == 0

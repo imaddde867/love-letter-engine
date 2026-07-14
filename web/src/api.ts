@@ -37,14 +37,18 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: { "Content-Type": "application/json", ...options?.headers },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.detail?.message ?? body.detail ?? `Request failed: ${response.status}`);
   }
   return response.json();
+}
+
+function authHeader(token: string): HeadersInit {
+  return { Authorization: `Bearer ${token}` };
 }
 
 export function createGame(
@@ -57,9 +61,9 @@ export function createGame(
 }
 
 export function getState(gameId: string, playerId: string, token: string): Promise<GameState> {
-  return request(
-    `/games/${gameId}?player_id=${encodeURIComponent(playerId)}&token=${encodeURIComponent(token)}`,
-  );
+  return request(`/games/${gameId}?player_id=${encodeURIComponent(playerId)}`, {
+    headers: authHeader(token),
+  });
 }
 
 export function getLegalActions(
@@ -67,9 +71,9 @@ export function getLegalActions(
   playerId: string,
   token: string,
 ): Promise<LegalAction[]> {
-  return request(
-    `/games/${gameId}/actions?player_id=${encodeURIComponent(playerId)}&token=${encodeURIComponent(token)}`,
-  );
+  return request(`/games/${gameId}/actions?player_id=${encodeURIComponent(playerId)}`, {
+    headers: authHeader(token),
+  });
 }
 
 export function postAction(
@@ -79,6 +83,7 @@ export function postAction(
 ): Promise<GameState> {
   return request(`/games/${gameId}/actions`, {
     method: "POST",
-    body: JSON.stringify({ ...action, token }),
+    headers: authHeader(token),
+    body: JSON.stringify(action),
   });
 }
