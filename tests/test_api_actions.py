@@ -7,7 +7,13 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from love_letter.api.app import create_game, engine, execute_action, get_state
+from love_letter.api.app import (
+    create_game,
+    engine,
+    execute_action,
+    get_legal_actions,
+    get_state,
+)
 from love_letter.api.schemas import ActionRequest, CreateGameRequest
 from love_letter.models.card import CardType
 
@@ -190,6 +196,44 @@ def test_chancellor_via_api_no_other_card():
     assert new_state["game_id"] == game_id
     alice = next(p for p in new_state["players"] if p["id"] == "alice")
     assert alice["hand_card"] is not None
+
+
+def test_get_legal_actions_off_turn_does_not_leak_draw_card():
+    """GET /actions for a player who isn't up returns nothing, even though
+    available_actions() would otherwise expose the deck's top card."""
+    game_id, _ = _create_game()
+    state = engine.get_state(game_id, "alice")
+    assert state.current_player_id == "alice"
+    state.players["bob"].hand_card = CardType.GUARD
+    state.deck = [CardType.PRINCESS]
+
+    actions = _run(get_legal_actions(game_id, player_id="bob"))
+    assert actions == []
+
+
+def test_execute_action_off_turn_is_rejected():
+    """POST /actions from a non-current player is rejected and state is unchanged."""
+    game_id, _ = _create_game()
+    state = engine.get_state(game_id, "alice")
+    assert state.current_player_id == "alice"
+    state.players["bob"].hand_card = CardType.HANDMAID
+    state.deck = [CardType.PRINCESS, CardType.GUARD]
+    deck_before = list(state.deck)
+
+    response = _run(execute_action(
+        game_id,
+        ActionRequest(
+            player_id="bob",
+            action_type="play_card",
+            card_in_hand=CardType.HANDMAID,
+            other_card=CardType.PRINCESS,
+        ),
+    ))
+    data = _response_json(response)
+    assert response.status_code == 400
+    assert data["error"] == "invalid_action"
+    assert "not bob's turn" in data["violations"][0]
+    assert engine.get_state(game_id, "bob").deck == deck_before
 
 
 def test_spy_serializes_as_zero_not_null():
