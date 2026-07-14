@@ -6,6 +6,7 @@ import { cardLabel } from "./cards";
 interface GameViewProps {
   gameId: string;
   yourId: string;
+  token: string;
 }
 
 const POLL_MS = 1200;
@@ -19,7 +20,7 @@ function describeAction(action: LegalAction): string {
   return parts.join(" ");
 }
 
-export function GameView({ gameId, yourId }: GameViewProps) {
+export function GameView({ gameId, yourId, token }: GameViewProps) {
   const [state, setState] = useState<GameState | null>(null);
   const [actions, setActions] = useState<LegalAction[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +37,13 @@ export function GameView({ gameId, yourId }: GameViewProps) {
 
     async function poll() {
       try {
-        const next = await getState(gameId, yourId);
+        const next = await getState(gameId, yourId, token);
         if (cancelled || submittingRef.current) return;
         setState(next);
         setError(null);
 
         if (next.current_player_id === yourId) {
-          const legal = await getLegalActions(gameId, yourId);
+          const legal = await getLegalActions(gameId, yourId, token);
           if (!cancelled && !submittingRef.current) setActions(legal);
         } else {
           setActions([]);
@@ -58,7 +59,7 @@ export function GameView({ gameId, yourId }: GameViewProps) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [gameId, yourId]);
+  }, [gameId, yourId, token]);
 
   if (error) return <p style={{ color: "crimson" }}>{error}</p>;
   if (!state) return <p>Loading...</p>;
@@ -69,7 +70,7 @@ export function GameView({ gameId, yourId }: GameViewProps) {
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      const next = await postAction(gameId, action);
+      const next = await postAction(gameId, action, token);
       setState(next);
       setActions([]);
     } catch (err) {

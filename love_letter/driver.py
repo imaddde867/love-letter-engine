@@ -96,6 +96,7 @@ def drive_game(
     client: httpx.Client,
     game_id: str,
     bot_assignments: dict[str, str],
+    tokens: dict[str, str],
     poll_interval: float = 1.0,
     on_turn: Optional[Callable[[dict, dict], None]] = None,
 ) -> str:
@@ -109,6 +110,8 @@ def drive_game(
         client: An ``httpx.Client`` pointed at the running API.
         game_id: The game to drive.
         bot_assignments: Maps player_id -> strategy name (see ``STRATEGIES``).
+        tokens: Maps player_id -> auth token, for every seat in
+            ``bot_assignments`` (as returned by ``POST /games``).
         poll_interval: Seconds to sleep between polls/turns, for spectator pacing.
         on_turn: Optional callback invoked with (state, action_taken) after
             each bot move, e.g. to print a spectator log.
@@ -120,7 +123,10 @@ def drive_game(
     stalled_polls = 0
 
     while True:
-        state = client.get(f"/games/{game_id}", params={"player_id": watcher_id}).json()
+        state = client.get(
+            f"/games/{game_id}",
+            params={"player_id": watcher_id, "token": tokens[watcher_id]},
+        ).json()
 
         winner = _is_game_over(state)
         if winner is not None:
@@ -134,7 +140,8 @@ def drive_game(
             continue
 
         actions = client.get(
-            f"/games/{game_id}/actions", params={"player_id": current_id}
+            f"/games/{game_id}/actions",
+            params={"player_id": current_id, "token": tokens[current_id]},
         ).json()
         if not actions:
             stalled_polls += 1
@@ -147,11 +154,12 @@ def drive_game(
         # the watcher's real hand card, breaking the "only see what the API
         # exposes" guarantee.
         actor_state = client.get(
-            f"/games/{game_id}", params={"player_id": current_id}
+            f"/games/{game_id}",
+            params={"player_id": current_id, "token": tokens[current_id]},
         ).json()
 
         strategy = STRATEGIES[bot_assignments[current_id]]
-        chosen = strategy(actions, actor_state)
+        chosen = {**strategy(actions, actor_state), "token": tokens[current_id]}
 
         response = client.post(f"/games/{game_id}/actions", json=chosen)
         response.raise_for_status()

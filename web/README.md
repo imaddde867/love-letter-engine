@@ -1,32 +1,38 @@
-# React + TypeScript + Vite
+# Love Letter GUI
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite spectator/player GUI for the Love Letter engine's HTTP API.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Dev server runs at `http://localhost:5173`. It talks to the backend API at
+`http://127.0.0.1:8000` by default; override with a `VITE_API_URL` env var
+(see `src/api.ts`).
+
+## Running against a game
+
+1. Start the backend API server from the repo root:
+
+   ```bash
+   python -m love_letter serve
+   ```
+
+2. Create a game and drive it with bots (or leave seats for humans) using the
+   `watch` CLI command, which exercises the same HTTP API the GUI uses:
+
+   ```bash
+   python -m love_letter watch --bots random greedy
+   ```
+
+   This prints the new `game_id` and streams moves as they happen.
+
+3. Point the GUI at that `game_id` (via `CreateGame.tsx` or the URL, per the
+   app's UI) to spectate or play through the browser.
+
+To attach the driver to a game the GUI already created instead, pass
+`--game-id <id>` along with `seat_id:strategy` bot assignments — see
+`python -m love_letter watch --help`.

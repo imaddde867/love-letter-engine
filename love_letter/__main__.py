@@ -63,7 +63,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--game-id",
         default=None,
         help="Attach to an existing game instead of creating a new one. "
-        "Requires --bots entries in 'seat_id:strategy' form.",
+        "Requires --bots entries in 'seat_id:strategy:token' form.",
     )
     watch_parser.add_argument(
         "--bots",
@@ -73,8 +73,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "Without --game-id: one strategy per seat (2-6 seats), creating "
             f"seats p0..pN — e.g. 'random greedy'. Strategies: "
             f"{', '.join(sorted(_BOT_FACTORIES))}, or 'human' to leave a seat "
-            "unplayed. With --game-id: 'seat_id:strategy' pairs for the seats "
-            "you want this process to control, e.g. 'bot1:random bot2:greedy'."
+            "unplayed. With --game-id: 'seat_id:strategy:token' triples for "
+            "the seats you want this process to control (token as issued by "
+            "the game's creator), e.g. 'bot1:random:abc123 bot2:greedy:def456'."
         ),
     )
     watch_parser.add_argument(
@@ -119,15 +120,19 @@ def _run_watch(args: argparse.Namespace) -> int:
 
     if attaching:
         bot_assignments: dict[str, str] = {}
+        tokens: dict[str, str] = {}
         for entry in args.bots:
-            if ":" not in entry:
+            parts = entry.split(":", 2)
+            if len(parts) != 3:
                 print(
-                    f"--game-id requires 'seat_id:strategy' entries, got '{entry}'",
+                    f"--game-id requires 'seat_id:strategy:token' entries, "
+                    f"got '{entry}'",
                     file=sys.stderr,
                 )
                 return 1
-            seat_id, strategy = entry.split(":", 1)
+            seat_id, strategy, token = parts
             bot_assignments[seat_id] = strategy
+            tokens[seat_id] = token
     else:
         if len(args.bots) < 2 or len(args.bots) > 6:
             print("--bots needs 2-6 seats", file=sys.stderr)
@@ -151,7 +156,9 @@ def _run_watch(args: argparse.Namespace) -> int:
         else:
             response = client.post("/games", json={"player_ids": player_ids})
             response.raise_for_status()
-            game_id = response.json()["game_id"]
+            body = response.json()
+            game_id = body["game_id"]
+            tokens = body["tokens"]
             print(f"Game {game_id} started: {dict(zip(player_ids, args.bots))}")
 
         def on_turn(state: dict, action: dict) -> None:
@@ -163,6 +170,7 @@ def _run_watch(args: argparse.Namespace) -> int:
             client,
             game_id,
             bot_assignments,
+            tokens,
             poll_interval=args.interval,
             on_turn=on_turn,
         )

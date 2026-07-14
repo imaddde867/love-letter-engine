@@ -48,19 +48,22 @@ def test_choose_spy_prefers_spy_action():
 
 def test_drive_game_plays_a_full_bot_vs_bot_game(client):
     create_resp = client.post("/games", json={"player_ids": ["alice", "bob"]})
-    game_id = create_resp.json()["game_id"]
+    body = create_resp.json()
+    game_id = body["game_id"]
+    tokens = body["tokens"]
 
     winner = drive_game(
         client,
         game_id,
         bot_assignments={"alice": "random", "bob": "greedy"},
+        tokens=tokens,
         poll_interval=0,
     )
 
     assert winner in ("alice", "bob")
 
     final_state = client.get(
-        f"/games/{game_id}", params={"player_id": "alice"}
+        f"/games/{game_id}", params={"player_id": "alice", "token": tokens["alice"]}
     ).json()
     winner_tokens = next(
         p["favor_tokens"] for p in final_state["players"] if p["id"] == winner
@@ -76,17 +79,20 @@ def test_drive_game_crosses_multiple_round_boundaries(client):
     transitions. This is the exact gap 176 passing tests didn't cover.
     """
     create_resp = client.post("/games", json={"player_ids": ["alice", "bob"]})
-    game_id = create_resp.json()["game_id"]
+    body = create_resp.json()
+    game_id = body["game_id"]
+    tokens = body["tokens"]
 
     winner = drive_game(
         client,
         game_id,
         bot_assignments={"alice": "random", "bob": "random"},
+        tokens=tokens,
         poll_interval=0,
     )
 
     final_state = client.get(
-        f"/games/{game_id}", params={"player_id": "alice"}
+        f"/games/{game_id}", params={"player_id": "alice", "token": tokens["alice"]}
     ).json()
     assert final_state["round"] > 1
     assert winner in ("alice", "bob")
@@ -101,13 +107,16 @@ def test_drive_game_never_leaks_an_active_opponents_hand_to_the_strategy(client)
     targets, contradicting the "only see what the API exposes" guarantee.
     """
     create_resp = client.post("/games", json={"player_ids": ["alice", "bob"]})
-    game_id = create_resp.json()["game_id"]
+    body = create_resp.json()
+    game_id = body["game_id"]
+    tokens = body["tokens"]
 
     seen_states = []
     drive_game(
         client,
         game_id,
         bot_assignments={"alice": "greedy", "bob": "greedy"},
+        tokens=tokens,
         poll_interval=0,
         on_turn=lambda state, action: seen_states.append((state, action)),
     )
@@ -123,15 +132,48 @@ def test_drive_game_never_leaks_an_active_opponents_hand_to_the_strategy(client)
 
 def test_drive_game_calls_on_turn_callback(client):
     create_resp = client.post("/games", json={"player_ids": ["alice", "bob"]})
-    game_id = create_resp.json()["game_id"]
+    body = create_resp.json()
+    game_id = body["game_id"]
+    tokens = body["tokens"]
 
     calls = []
     drive_game(
         client,
         game_id,
         bot_assignments={"alice": "random", "bob": "random"},
+        tokens=tokens,
         poll_interval=0,
         on_turn=lambda state, action: calls.append(action),
     )
 
     assert len(calls) > 0
+
+
+def test_get_state_via_http_rejects_spoofed_player_id():
+    """A caller who only knows 'bob' as a string cannot fetch bob's state."""
+    with TestClient(app) as c:
+        create_resp = c.post("/games", json={"player_ids": ["alice", "bob"]})
+        game_id = create_resp.json()["game_id"]
+
+        response = c.get(
+            f"/games/{game_id}", params={"player_id": "bob", "token": "guessed-token"}
+        )
+        assert response.status_code == 403
+
+
+def test_post_action_via_http_rejects_spoofed_player_id():
+    """A caller cannot submit bob's turn over HTTP using only his player_id."""
+    with TestClient(app) as c:
+        create_resp = c.post("/games", json={"player_ids": ["alice", "bob"]})
+        game_id = create_resp.json()["game_id"]
+
+        response = c.post(
+            f"/games/{game_id}/actions",
+            json={
+                "player_id": "bob",
+                "token": "guessed-token",
+                "action_type": "play_card",
+                "card_in_hand": 5,
+            },
+        )
+        assert response.status_code == 403
