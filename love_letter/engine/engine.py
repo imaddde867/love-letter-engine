@@ -363,6 +363,49 @@ class Engine:
         # Check if any player has reached the threshold
         # (Game over check happens in execute_action after this)
 
+    def _start_new_round(self, state: GameState) -> None:
+        """Reset state for a new round: reshuffle, reinstate players, redeal.
+
+        Callers must check ``_is_game_over`` first — this always deals a new
+        round regardless of favor tokens.
+
+        Args:
+            state: The game state to reset in place.
+        """
+        player_ids = list(state.players.keys())
+
+        # Collect every card back into the pool: undrawn deck, played cards,
+        # the set-aside facedown card, and whatever is left in hands.
+        all_cards: list[CardType] = list(state.deck)
+        for entry in state.played_cards:
+            all_cards.append(entry["card"])
+        if state.facedown_card is not None:
+            all_cards.append(state.facedown_card)
+        for pid in player_ids:
+            if state.players[pid].hand_card is not None:
+                all_cards.append(state.players[pid].hand_card)
+
+        # Reinstate all players for the new round
+        for pid in player_ids:
+            state.players[pid].is_active = True
+            state.players[pid].hand_card = None
+            state.players[pid].cards_played = []
+            state.players[pid].protected_until_next_turn = False
+
+        random.shuffle(all_cards)
+        state.deck = all_cards
+        state.played_cards = []
+
+        for pid in player_ids:
+            if state.deck:
+                state.players[pid].hand_card = state.deck.pop(0)
+
+        if state.deck:
+            state.facedown_card = state.deck.pop(0)
+
+        state.round += 1
+        state.current_player_index = 0
+
     def _is_game_over(self, state: GameState) -> bool:
         """Check if the game is over (any player reached threshold).
 

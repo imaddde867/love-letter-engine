@@ -49,8 +49,8 @@ def test_prince_princess_discard_eliminate():
     assert state.players["bob"].is_active is False
 
 
-def test_prince_requires_target():
-    """Prince without target raises ValueError."""
+def test_prince_without_target_is_a_no_op():
+    """Prince with no target_player (no valid targets) has no effect."""
     state = GameState(game_id="g1", round=1)
     action = Action(
         action_type="play_card",
@@ -59,11 +59,8 @@ def test_prince_requires_target():
         other_card=CardType.BARON,
     )
 
-    try:
-        PrinceEffect.resolve(state, action)
-        assert False, "Should have raised ValueError"
-    except ValueError as e:
-        assert "target_player" in str(e).lower()
+    result = PrinceEffect.resolve(state, action)
+    assert result is state
 
 
 def test_prince_self_target():

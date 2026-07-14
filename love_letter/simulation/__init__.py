@@ -6,7 +6,6 @@ result with round-by-round logs.
 
 from __future__ import annotations
 
-import random
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -14,7 +13,6 @@ from love_letter.bots import Player
 from love_letter.engine.engine import Engine
 from love_letter.engine.legal_actions import available_actions
 from love_letter.models.action import Action
-from love_letter.models.card import CardType
 from love_letter.models.state import GameState
 
 
@@ -104,7 +102,7 @@ def simulate(
             round_num += 1
 
             # Reset for new round: redraw decks, reinstate players
-            state = _start_new_round(engine, game_id, player_ids)
+            engine._start_new_round(state)
             continue
 
         # Get current player
@@ -183,51 +181,3 @@ class _PlayerTracker:
         return self._bot.choose_action(state)
 
 
-def _start_new_round(
-    engine: Engine, game_id: str, player_ids: list[str]
-) -> GameState:
-    """Reset the engine for a new round.
-
-    Reinstates eliminated players, reshuffles the deck with played cards,
-    and deals new hands.
-    """
-    state = engine.get_state(game_id, player_ids[0])
-
-    # Collect all cards back into the deck BEFORE resetting players
-    all_cards: list[CardType] = list(state.deck)
-    for entry in state.played_cards:
-        all_cards.append(entry["card"])
-    # Add back the facedown card if it exists
-    if state.facedown_card is not None:
-        all_cards.append(state.facedown_card)
-    # Collect hand cards from all players
-    for pid in player_ids:
-        if state.players[pid].hand_card is not None:
-            all_cards.append(state.players[pid].hand_card)
-
-    # Reinstate all players
-    for pid in player_ids:
-        state.players[pid].is_active = True
-        state.players[pid].hand_card = None
-        state.players[pid].cards_played = []
-        state.players[pid].protected_until_next_turn = False
-
-    # Reshuffle
-    random.shuffle(all_cards)
-
-    state.deck = all_cards
-    state.played_cards = []
-
-    # Deal one card to each player
-    for pid in player_ids:
-        if state.deck:
-            state.players[pid].hand_card = state.deck.pop(0)
-
-    # Set facedown card
-    if state.deck:
-        state.facedown_card = state.deck.pop(0)
-
-    state.round += 1
-    state.current_player_index = 0
-
-    return state

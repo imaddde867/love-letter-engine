@@ -28,7 +28,8 @@ class PriestEffect:
             ValueError: If target_player is missing.
         """
         if not action.target_player:
-            raise ValueError("Priest requires a target_player")
+            # No valid target (e.g. every opponent is protected) — no effect.
+            return state
 
         # Priest reveals the target's hand to the actor
         # This is information only; no state changes needed

@@ -150,8 +150,13 @@ def test_action_request_accepts_missing_other_card():
 
 
 def test_princess_discard_via_api_no_other_card():
-    """Princess discard works end-to-end without other_card in request."""
-    game_id, _ = _create_game()
+    """Princess discard works end-to-end without other_card in request.
+
+    Uses 3 players so eliminating alice leaves 2 players active (round
+    continues) instead of 1 (round ends and immediately redeals alice a
+    new hand, which would mask the assertion below).
+    """
+    game_id, _ = _create_game(["alice", "bob", "carol"])
     state = engine.get_state(game_id, "alice")
     state.players["alice"].hand_card = CardType.PRINCESS
     state.deck = [CardType.GUARD, CardType.BARON]
