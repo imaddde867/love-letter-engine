@@ -11,8 +11,9 @@ def _run(coro):
     return asyncio.run(coro)
 
 
-def _create_game() -> str:
-    return _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))["game_id"]
+def _create_game() -> tuple[str, dict]:
+    created = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
+    return created["game_id"], created["tokens"]
 
 
 def _set_turn_cards(game_id: str, player_id: str, hand: CardType, drawn: CardType) -> None:
@@ -23,22 +24,23 @@ def _set_turn_cards(game_id: str, player_id: str, hand: CardType, drawn: CardTyp
 
 def test_get_state_includes_played_cards_field():
     """GET /games/{id} must include played_cards in the response."""
-    game_id = _create_game()
+    game_id, tokens = _create_game()
 
-    data = _run(get_state(game_id, player_id="alice"))
+    data = _run(get_state(game_id, player_id="alice", token=tokens["alice"]))
     assert "played_cards" in data
     assert isinstance(data["played_cards"], list)
 
 
 def test_played_cards_populated_after_action():
     """played_cards must be populated after a card is played."""
-    game_id = _create_game()
+    game_id, tokens = _create_game()
     _set_turn_cards(game_id, "alice", CardType.HANDMAID, CardType.PRINCESS)
 
     new_state = _run(execute_action(
         game_id,
         ActionRequest(
             player_id="alice",
+            token=tokens["alice"],
             action_type="play_card",
             card_in_hand=CardType.HANDMAID,
             other_card=CardType.PRINCESS,
@@ -53,13 +55,14 @@ def test_played_cards_populated_after_action():
 
 def test_played_cards_multiple_entries():
     """played_cards must accumulate entries across multiple actions."""
-    game_id = _create_game()
+    game_id, tokens = _create_game()
     _set_turn_cards(game_id, "alice", CardType.HANDMAID, CardType.PRINCESS)
 
     _run(execute_action(
         game_id,
         ActionRequest(
             player_id="alice",
+            token=tokens["alice"],
             action_type="play_card",
             card_in_hand=CardType.HANDMAID,
             other_card=CardType.PRINCESS,
@@ -71,6 +74,7 @@ def test_played_cards_multiple_entries():
         game_id,
         ActionRequest(
             player_id="bob",
+            token=tokens["bob"],
             action_type="play_card",
             card_in_hand=CardType.COUNTESS,
             other_card=CardType.PRINCESS,
@@ -83,28 +87,29 @@ def test_played_cards_multiple_entries():
 
 def test_your_id_matches_requesting_player():
     """your_id in the response must match the requesting player."""
-    game_id = _create_game()
+    game_id, tokens = _create_game()
 
-    data = _run(get_state(game_id, player_id="bob"))
+    data = _run(get_state(game_id, player_id="bob", token=tokens["bob"]))
     assert data["your_id"] == "bob"
 
 
 def test_get_state_after_action_has_both_fields():
     """GET /games/{id} after actions must include both played_cards and your_id."""
-    game_id = _create_game()
+    game_id, tokens = _create_game()
     _set_turn_cards(game_id, "alice", CardType.HANDMAID, CardType.PRINCESS)
 
     _run(execute_action(
         game_id,
         ActionRequest(
             player_id="alice",
+            token=tokens["alice"],
             action_type="play_card",
             card_in_hand=CardType.HANDMAID,
             other_card=CardType.PRINCESS,
         ),
     ))
 
-    data = _run(get_state(game_id, player_id="bob"))
+    data = _run(get_state(game_id, player_id="bob", token=tokens["bob"]))
     assert "played_cards" in data
     assert "your_id" in data
     assert len(data["played_cards"]) == 1
@@ -114,7 +119,7 @@ def test_get_state_after_action_has_both_fields():
 
 def test_played_cards_include_target_player_when_present():
     """played_cards entries include target_player to match the PLAN contract."""
-    game_id = _create_game()
+    game_id, tokens = _create_game()
     _set_turn_cards(game_id, "alice", CardType.GUARD, CardType.PRIEST)
     # Guess deliberately wrong so bob survives — a correct guess would
     # eliminate him, end the round, and reset played_cards for round 2.
@@ -124,6 +129,7 @@ def test_played_cards_include_target_player_when_present():
         game_id,
         ActionRequest(
             player_id="alice",
+            token=tokens["alice"],
             action_type="play_card",
             card_in_hand=CardType.GUARD,
             other_card=CardType.PRIEST,

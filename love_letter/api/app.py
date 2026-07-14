@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,6 +16,18 @@ from love_letter.models.action import Action
 from love_letter.models.state import GameState
 
 engine = Engine()
+
+# Per-seat auth tokens, issued at game creation. Keeps callers from reading
+# or acting on a seat by simply supplying its player_id string — a token
+# proves the caller was actually handed that seat.
+_tokens: dict[str, dict[str, str]] = {}
+
+
+def _authorize(game_id: str, player_id: str, token: str) -> None:
+    """Raise 403 unless ``token`` matches the seat issued to ``player_id``."""
+    game_tokens = _tokens.get(game_id, {})
+    if not secrets.compare_digest(game_tokens.get(player_id, ""), token):
+        raise HTTPException(status_code=403, detail="Invalid player_id or token")
 
 
 def _card_value(card):
@@ -91,27 +105,36 @@ async def create_game(request: CreateGameRequest):
         )
 
     game_id = engine.create_game(request.player_ids)
-    return {"game_id": game_id}
+    tokens = {player_id: secrets.token_urlsafe(24) for player_id in request.player_ids}
+    _tokens[game_id] = tokens
+    return {"game_id": game_id, "tokens": tokens}
 
 
 @app.get("/games/{game_id}")
-async def get_state(game_id: str, player_id: str = Query(...)):
+async def get_state(
+    game_id: str, player_id: str = Query(...), token: str = Query(...)
+):
     """Get the current game state for a specific player."""
     try:
         state = engine.get_state(game_id, player_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Game not found")
 
+    _authorize(game_id, player_id, token)
     return _state_to_dict(state, player_id)
 
 
 @app.get("/games/{game_id}/actions")
-async def get_legal_actions(game_id: str, player_id: str = Query(...)):
+async def get_legal_actions(
+    game_id: str, player_id: str = Query(...), token: str = Query(...)
+):
     """List the legal actions ``player_id`` can currently take."""
     try:
         state = engine.get_state(game_id, player_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Game not found")
+
+    _authorize(game_id, player_id, token)
 
     if player_id != state.current_player_id:
         return []
@@ -123,6 +146,18 @@ async def get_legal_actions(game_id: str, player_id: str = Query(...)):
 async def execute_action(game_id: str, request: ActionRequest):
     """Execute an action for a player in a game."""
     action = Action.model_validate(request, from_attributes=True)
+
+    # Resolve game/player existence first so unknown-game/unknown-player
+    # responses keep their pre-existing 404/400 shape; only a real seat can
+    # be subject to a token check.
+    try:
+        engine.get_state(game_id, request.player_id)
+    except KeyError as e:
+        message = str(e).strip('"')
+        status_code = 404 if message.startswith("Game ") else 400
+        raise HTTPException(status_code=status_code, detail=message)
+
+    _authorize(game_id, request.player_id, request.token)
 
     try:
         state = engine.execute_action(game_id, request.player_id, action)

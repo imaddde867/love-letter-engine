@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createGame } from "./api";
 
 interface CreateGameProps {
-  onCreated: (gameId: string, yourId: string, seatIds: string[]) => void;
+  onCreated: (gameId: string, yourId: string, token: string) => void;
 }
 
 export function CreateGame({ onCreated }: CreateGameProps) {
@@ -11,7 +11,11 @@ export function CreateGame({ onCreated }: CreateGameProps) {
   const [botNames, setBotNames] = useState(["bot1"]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [created, setCreated] = useState<{ gameId: string; seatIds: string[] } | null>(null);
+  const [created, setCreated] = useState<{
+    gameId: string;
+    seatIds: string[];
+    tokens: Record<string, string>;
+  } | null>(null);
 
   const otherSeatCount = seatCount - 1;
   // Derive per-index with a fallback, rather than slicing + padding —
@@ -28,8 +32,8 @@ export function CreateGame({ onCreated }: CreateGameProps) {
     setError(null);
     setBusy(true);
     try {
-      const { game_id } = await createGame(seatIds);
-      setCreated({ gameId: game_id, seatIds });
+      const { game_id, tokens } = await createGame(seatIds);
+      setCreated({ gameId: game_id, seatIds, tokens });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -38,7 +42,10 @@ export function CreateGame({ onCreated }: CreateGameProps) {
   }
 
   if (created) {
-    const botSeats = created.seatIds.slice(1).map((id) => `${id}:random`).join(" ");
+    const botSeats = created.seatIds
+      .slice(1)
+      .map((id) => `${id}:random:${created.tokens[id]}`)
+      .join(" ");
     const watchCommand = `love_letter watch --game-id ${created.gameId} --bots ${botSeats}`;
     return (
       <div style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
@@ -47,7 +54,11 @@ export function CreateGame({ onCreated }: CreateGameProps) {
         <pre style={{ background: "#222", color: "#eee", padding: 12, borderRadius: 8 }}>
           {watchCommand}
         </pre>
-        <button onClick={() => onCreated(created.gameId, created.seatIds[0], created.seatIds)}>
+        <button
+          onClick={() =>
+            onCreated(created.gameId, created.seatIds[0], created.tokens[created.seatIds[0]])
+          }
+        >
           Enter game
         </button>
       </div>

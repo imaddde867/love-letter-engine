@@ -47,24 +47,38 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json();
 }
 
-export function createGame(playerIds: string[]): Promise<{ game_id: string }> {
+export function createGame(
+  playerIds: string[],
+): Promise<{ game_id: string; tokens: Record<string, string> }> {
   return request("/games", {
     method: "POST",
     body: JSON.stringify({ player_ids: playerIds }),
   });
 }
 
-export function getState(gameId: string, playerId: string): Promise<GameState> {
-  return request(`/games/${gameId}?player_id=${encodeURIComponent(playerId)}`);
+export function getState(gameId: string, playerId: string, token: string): Promise<GameState> {
+  return request(
+    `/games/${gameId}?player_id=${encodeURIComponent(playerId)}&token=${encodeURIComponent(token)}`,
+  );
 }
 
-export function getLegalActions(gameId: string, playerId: string): Promise<LegalAction[]> {
-  return request(`/games/${gameId}/actions?player_id=${encodeURIComponent(playerId)}`);
+export function getLegalActions(
+  gameId: string,
+  playerId: string,
+  token: string,
+): Promise<LegalAction[]> {
+  return request(
+    `/games/${gameId}/actions?player_id=${encodeURIComponent(playerId)}&token=${encodeURIComponent(token)}`,
+  );
 }
 
-export function postAction(gameId: string, action: LegalAction): Promise<GameState> {
+export function postAction(
+  gameId: string,
+  action: LegalAction,
+  token: string,
+): Promise<GameState> {
   return request(`/games/${gameId}/actions`, {
     method: "POST",
-    body: JSON.stringify(action),
+    body: JSON.stringify({ ...action, token }),
   });
 }

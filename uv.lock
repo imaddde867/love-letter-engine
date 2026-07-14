@@ -168,6 +168,11 @@ wheels = [
 name = "love-letter"
 version = "0.1.0"
 source = { editable = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "uvicorn" },
+]
 
 [package.optional-dependencies]
 dev = [
@@ -176,23 +181,20 @@ dev = [
 ]
 test = [
     { name = "anyio" },
-    { name = "fastapi" },
-    { name = "httpx" },
     { name = "hypothesis" },
     { name = "pytest" },
-    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "anyio", marker = "extra == 'test'", specifier = ">=4.8,<4.10" },
-    { name = "fastapi", marker = "extra == 'test'", specifier = ">=0.115,<0.116" },
-    { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27,<0.28" },
+    { name = "fastapi", specifier = ">=0.115,<0.116" },
+    { name = "httpx", specifier = ">=0.27,<0.28" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "hypothesis", marker = "extra == 'test'", specifier = ">=6.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
-    { name = "uvicorn", marker = "extra == 'test'", specifier = ">=0.30,<0.31" },
+    { name = "uvicorn", specifier = ">=0.30,<0.31" },
 ]
 provides-extras = ["dev", "test"]
 
