@@ -95,7 +95,7 @@ def test_prince_discard_is_not_lost_when_round_rebuilds_deck():
     """Regression: a Prince-forced discard must survive into the next round.
 
     Previously the target's discarded card was set to hand_card=None and
-    never recorded anywhere, so _start_new_round's deck rebuild (which
+    never recorded anywhere, so start_new_round's deck rebuild (which
     sums state.deck + played_cards + facedown_card + remaining hands)
     silently dropped it — the game lost a card every time Prince forced
     a non-Princess discard.
@@ -130,6 +130,6 @@ def test_prince_discard_is_not_lost_when_round_rebuilds_deck():
     # Force the round to end and rebuild the deck for round 2.
     state.deck = []
     state.facedown_card = None
-    Engine()._start_new_round(state)
+    Engine().start_new_round(state)
 
     assert _total_card_count(state) == total_before

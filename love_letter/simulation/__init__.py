@@ -79,7 +79,7 @@ def simulate(
 
     while True:
         state = engine.get_state(game_id, player_ids[0])
-        game_over = engine._is_game_over(state)
+        game_over = engine.is_game_over(state)
 
         if game_over:
             # Find the winner
@@ -90,7 +90,7 @@ def simulate(
                     break
             break
 
-        if engine._is_round_over(state):
+        if engine.is_round_over(state):
             # Record round end
             active = [pid for pid in player_ids if state.players[pid].is_active]
             round_data = {
@@ -102,7 +102,7 @@ def simulate(
             round_num += 1
 
             # Reset for new round: redraw decks, reinstate players
-            engine._start_new_round(state)
+            engine.start_new_round(state)
             continue
 
         # Get current player
