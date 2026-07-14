@@ -39,6 +39,24 @@ def test_available_actions_filter_by_player():
         assert action.player_id == "alice"
 
 
+def test_prince_can_still_self_target_when_only_opponent_is_protected():
+    """Prince must offer self-targeting when every opponent is protected.
+
+    Regression: Prince is the only targeting card that may target the
+    acting player. `_valid_targets` excludes self by default, so without
+    special-casing Prince, a locked-out player would get a no-op action
+    instead of the mandatory self-target discard-and-redraw.
+    """
+    state = _make_state(CardType.PRINCE, deck_first=CardType.GUARD)
+    state.players["bob"].protected_until_next_turn = True
+
+    result = available_actions(state, "alice")
+    prince_actions = [a for a in result if a.card_in_hand == CardType.PRINCE]
+
+    assert any(a.target_player == "alice" for a in prince_actions)
+    assert not any(a.target_player is None for a in prince_actions)
+
+
 def test_available_actions_card_in_hand_matches_turn_cards():
     """Every returned action's card_in_hand is one of the player's two turn cards."""
     state = _make_state(CardType.GUARD, CardType.PRIEST)
@@ -69,11 +87,16 @@ def test_available_actions_guard_requires_guess():
 
 
 def test_available_actions_targeting_cards_require_target():
-    """Priest, Baron, King, Prince require a target_player."""
+    """Priest, Baron, King require a non-self target_player.
+
+    Prince is excluded here — unlike the other targeting cards, it may
+    legally target the acting player (see test_prince_self_target and
+    test_prince_can_still_self_target_when_only_opponent_is_protected).
+    """
     state = _make_state(CardType.PRIEST)
     result = available_actions(state, "alice")
     targeting = [a for a in result if a.card_in_hand in (
-        CardType.PRIEST, CardType.BARON, CardType.KING, CardType.PRINCE
+        CardType.PRIEST, CardType.BARON, CardType.KING
     )]
     for action in targeting:
         assert action.target_player is not None

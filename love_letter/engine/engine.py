@@ -154,7 +154,7 @@ class Engine:
         state = self.get_state(game_id, player_id)
 
         # Check if game is over before executing
-        if self._is_game_over(state):
+        if self.is_game_over(state):
             raise GameOverError(game_id)
 
         # Validate action and raise InvalidActionError with violations
@@ -269,7 +269,7 @@ class Engine:
         state = self._apply_card_effect(state, player_id, action)
 
         # Step 4: Check if round should end
-        if self._is_round_over(state):
+        if self.is_round_over(state):
             self._end_round(state)
             return state
 
@@ -303,7 +303,7 @@ class Engine:
 
         return effect_cls.resolve(state, action)
 
-    def _is_round_over(self, state: GameState) -> bool:
+    def is_round_over(self, state: GameState) -> bool:
         """Check if the round should end.
 
         A round ends when:
@@ -363,7 +363,50 @@ class Engine:
         # Check if any player has reached the threshold
         # (Game over check happens in execute_action after this)
 
-    def _is_game_over(self, state: GameState) -> bool:
+    def start_new_round(self, state: GameState) -> None:
+        """Reset state for a new round: reshuffle, reinstate players, redeal.
+
+        Callers must check ``is_game_over`` first — this always deals a new
+        round regardless of favor tokens.
+
+        Args:
+            state: The game state to reset in place.
+        """
+        player_ids = list(state.players.keys())
+
+        # Collect every card back into the pool: undrawn deck, played cards,
+        # the set-aside facedown card, and whatever is left in hands.
+        all_cards: list[CardType] = list(state.deck)
+        for entry in state.played_cards:
+            all_cards.append(entry["card"])
+        if state.facedown_card is not None:
+            all_cards.append(state.facedown_card)
+        for pid in player_ids:
+            if state.players[pid].hand_card is not None:
+                all_cards.append(state.players[pid].hand_card)
+
+        # Reinstate all players for the new round
+        for pid in player_ids:
+            state.players[pid].is_active = True
+            state.players[pid].hand_card = None
+            state.players[pid].cards_played = []
+            state.players[pid].protected_until_next_turn = False
+
+        random.shuffle(all_cards)
+        state.deck = all_cards
+        state.played_cards = []
+
+        for pid in player_ids:
+            if state.deck:
+                state.players[pid].hand_card = state.deck.pop(0)
+
+        if state.deck:
+            state.facedown_card = state.deck.pop(0)
+
+        state.round += 1
+        state.current_player_index = 0
+
+    def is_game_over(self, state: GameState) -> bool:
         """Check if the game is over (any player reached threshold).
 
         Args:

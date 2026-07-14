@@ -55,6 +55,10 @@ def available_actions(state: GameState, player_id: str) -> list[Action]:
 
     turn_cards = _turn_cards(state, player_id)
     targets = _valid_targets(state, player_id)
+    # Prince may always target yourself, even when every opponent is
+    # protected — so it never falls back to a no-op the way the other
+    # targeting cards do.
+    prince_targets = _valid_targets(state, player_id, include_self=True)
     guesses = _valid_guesses()
 
     actions: list[Action] = []
@@ -93,7 +97,23 @@ def available_actions(state: GameState, player_id: str) -> list[Action]:
 
         for other in other_card_options:
             if card_in_hand in _TARGETING_CARDS:
-                for target in targets:
+                card_targets = prince_targets if card_in_hand == CardType.PRINCE else targets
+                if not card_targets:
+                    # No valid targets (e.g. every opponent is protected by
+                    # Handmaid) — the card is still playable, just with no
+                    # effect, per the rules. Prince always has at least
+                    # itself as a target, so this only applies to the
+                    # other targeting cards.
+                    actions.append(Action(
+                        action_type="play_card",
+                        card_in_hand=card_in_hand,
+                        other_card=other,
+                        player_id=player_id,
+                        target_player=None,
+                        guess=None,
+                    ))
+                    continue
+                for target in card_targets:
                     guess_options = guesses if card_in_hand == CardType.GUARD else [None]
                     for guess in guess_options:
                         action = Action(
@@ -144,15 +164,22 @@ def _turn_cards(state: GameState, player_id: str) -> list[CardType]:
     return cards
 
 
-def _valid_targets(state: GameState, player_id: str) -> list[str]:
-    """Return active player IDs that can be targeted, excluding self."""
+def _valid_targets(
+    state: GameState, player_id: str, include_self: bool = False
+) -> list[str]:
+    """Return active player IDs that can be targeted.
+
+    Excludes self unless ``include_self`` is set (Prince is the only card
+    that may target the acting player).
+    """
     targets: list[str] = []
     for pid, player in state.players.items():
-        if pid == player_id:
+        if pid == player_id and not include_self:
             continue
         if not player.is_active:
             continue
-        if player.protected_until_next_turn:
+        # Handmaid protection blocks other players' effects, not your own.
+        if pid != player_id and player.protected_until_next_turn:
             continue
         targets.append(pid)
     return targets

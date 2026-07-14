@@ -49,8 +49,8 @@ def test_guard_wrong_guess_no_effect():
     assert state.players["bob"].is_active is True
 
 
-def test_guard_requires_target_and_guess():
-    """Guard without target or guess raises ValueError."""
+def test_guard_without_target_is_a_no_op():
+    """Guard with no target_player (no valid targets) has no effect."""
     state = GameState(game_id="g1", round=1)
     action = Action(
         action_type="play_card",
@@ -59,11 +59,28 @@ def test_guard_requires_target_and_guess():
         other_card=CardType.PRIEST,
     )
 
+    result = GuardEffect.resolve(state, action)
+    assert result is state
+
+
+def test_guard_requires_guess_when_target_given():
+    """Guard with a target but no guess raises ValueError."""
+    state = GameState(game_id="g1", round=1)
+    state.players["alice"] = Player(id="alice")
+    state.players["bob"] = Player(id="bob", hand_card=CardType.PRIEST)
+    action = Action(
+        action_type="play_card",
+        card_in_hand=CardType.GUARD,
+        player_id="alice",
+        other_card=CardType.PRIEST,
+        target_player="bob",
+    )
+
     try:
         GuardEffect.resolve(state, action)
         assert False, "Should have raised ValueError"
     except ValueError as e:
-        assert "target_player" in str(e).lower() or "guess" in str(e).lower()
+        assert "guess" in str(e).lower()
 
 
 def test_guard_does_not_affect_other_players():

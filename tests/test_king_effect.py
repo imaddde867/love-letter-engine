@@ -30,8 +30,8 @@ def test_king_swaps_hands():
     assert state.players["bob"].hand_card == CardType.GUARD
 
 
-def test_king_requires_target():
-    """King without target raises ValueError."""
+def test_king_without_target_is_a_no_op():
+    """King with no target_player (no valid targets) has no effect."""
     state = GameState(game_id="g1", round=1)
     action = Action(
         action_type="play_card",
@@ -40,8 +40,5 @@ def test_king_requires_target():
         other_card=CardType.GUARD,
     )
 
-    try:
-        KingEffect.resolve(state, action)
-        assert False, "Should have raised ValueError"
-    except ValueError as e:
-        assert "target_player" in str(e).lower()
+    result = KingEffect.resolve(state, action)
+    assert result is state
