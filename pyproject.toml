@@ -22,8 +22,8 @@ test = [
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["love_letter"]
+[tool.setuptools.packages.find]
+include = ["love_letter*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

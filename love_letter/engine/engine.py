@@ -154,7 +154,7 @@ class Engine:
         state = self.get_state(game_id, player_id)
 
         # Check if game is over before executing
-        if self._is_game_over(state):
+        if self.is_game_over(state):
             raise GameOverError(game_id)
 
         # Validate action and raise InvalidActionError with violations
@@ -269,7 +269,7 @@ class Engine:
         state = self._apply_card_effect(state, player_id, action)
 
         # Step 4: Check if round should end
-        if self._is_round_over(state):
+        if self.is_round_over(state):
             self._end_round(state)
             return state
 
@@ -303,7 +303,7 @@ class Engine:
 
         return effect_cls.resolve(state, action)
 
-    def _is_round_over(self, state: GameState) -> bool:
+    def is_round_over(self, state: GameState) -> bool:
         """Check if the round should end.
 
         A round ends when:
@@ -363,10 +363,10 @@ class Engine:
         # Check if any player has reached the threshold
         # (Game over check happens in execute_action after this)
 
-    def _start_new_round(self, state: GameState) -> None:
+    def start_new_round(self, state: GameState) -> None:
         """Reset state for a new round: reshuffle, reinstate players, redeal.
 
-        Callers must check ``_is_game_over`` first — this always deals a new
+        Callers must check ``is_game_over`` first — this always deals a new
         round regardless of favor tokens.
 
         Args:
@@ -406,7 +406,7 @@ class Engine:
         state.round += 1
         state.current_player_index = 0
 
-    def _is_game_over(self, state: GameState) -> bool:
+    def is_game_over(self, state: GameState) -> bool:
         """Check if the game is over (any player reached threshold).
 
         Args:

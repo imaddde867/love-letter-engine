@@ -180,8 +180,8 @@ async def execute_action(
 
         # A round just ended (tokens awarded) but nobody hit the favor
         # threshold yet — deal the next round so the game can continue.
-        if not engine._is_game_over(state) and engine._is_round_over(state):
-            engine._start_new_round(state)
+        if not engine.is_game_over(state) and engine.is_round_over(state):
+            engine.start_new_round(state)
 
         return _state_to_dict(state, request.player_id)
 
