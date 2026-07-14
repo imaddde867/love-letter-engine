@@ -15,6 +15,10 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def _bearer(token: str) -> str:
+    return f"Bearer {token}"
+
+
 def test_create_game_returns_game_id():
     """POST /games creates a game and returns game_id."""
     data = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
@@ -41,7 +45,9 @@ def test_get_state_returns_state_for_existing_game():
     created = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
     game_id = created["game_id"]
 
-    data = _run(get_state(game_id, player_id="alice", token=created["tokens"]["alice"]))
+    data = _run(
+        get_state(game_id, player_id="alice", authorization=_bearer(created["tokens"]["alice"]))
+    )
     assert data["game_id"] == game_id
     assert "players" in data
 
@@ -49,7 +55,7 @@ def test_get_state_returns_state_for_existing_game():
 def test_get_state_returns_404_for_nonexistent_game():
     """GET /games/{game_id} returns 404 for unknown game."""
     with pytest.raises(HTTPException) as exc_info:
-        _run(get_state("nonexistent", player_id="alice", token="whatever"))
+        _run(get_state("nonexistent", player_id="alice", authorization=_bearer("whatever")))
 
     assert exc_info.value.status_code == 404
 
@@ -60,7 +66,9 @@ def test_get_state_rejects_wrong_token():
     game_id = created["game_id"]
 
     with pytest.raises(HTTPException) as exc_info:
-        _run(get_state(game_id, player_id="alice", token="not-alices-token"))
+        _run(
+            get_state(game_id, player_id="alice", authorization=_bearer("not-alices-token"))
+        )
 
     assert exc_info.value.status_code == 403
 
@@ -71,7 +79,11 @@ def test_get_state_rejects_another_players_token():
     game_id = created["game_id"]
 
     with pytest.raises(HTTPException) as exc_info:
-        _run(get_state(game_id, player_id="alice", token=created["tokens"]["bob"]))
+        _run(
+            get_state(
+                game_id, player_id="alice", authorization=_bearer(created["tokens"]["bob"])
+            )
+        )
 
     assert exc_info.value.status_code == 403
 
@@ -81,7 +93,9 @@ def test_get_state_includes_current_player_id():
     created = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
     game_id = created["game_id"]
 
-    data = _run(get_state(game_id, player_id="alice", token=created["tokens"]["alice"]))
+    data = _run(
+        get_state(game_id, player_id="alice", authorization=_bearer(created["tokens"]["alice"]))
+    )
     assert data["current_player_id"] == "alice"
 
 
@@ -92,7 +106,9 @@ def test_get_state_hides_other_players_hand_cards():
     state = engine.get_state(game_id, "alice")
     state.players["bob"].hand_card = CardType.PRINCESS
 
-    data = _run(get_state(game_id, player_id="alice", token=created["tokens"]["alice"]))
+    data = _run(
+        get_state(game_id, player_id="alice", authorization=_bearer(created["tokens"]["alice"]))
+    )
     bob = next(p for p in data["players"] if p["id"] == "bob")
     assert bob["hand_card"] is None
 
@@ -105,7 +121,9 @@ def test_get_state_reveals_eliminated_players_hand_card():
     state.players["bob"].hand_card = CardType.PRINCESS
     state.players["bob"].eliminate()
 
-    data = _run(get_state(game_id, player_id="alice", token=created["tokens"]["alice"]))
+    data = _run(
+        get_state(game_id, player_id="alice", authorization=_bearer(created["tokens"]["alice"]))
+    )
     bob = next(p for p in data["players"] if p["id"] == "bob")
     assert bob["hand_card"] == CardType.PRINCESS.value
 
@@ -115,7 +133,9 @@ def test_get_state_includes_drawn_card_on_your_own_turn():
     created = _run(create_game(CreateGameRequest(player_ids=["alice", "bob"])))
     game_id = created["game_id"]
 
-    data = _run(get_state(game_id, player_id="alice", token=created["tokens"]["alice"]))
+    data = _run(
+        get_state(game_id, player_id="alice", authorization=_bearer(created["tokens"]["alice"]))
+    )
     alice = next(p for p in data["players"] if p["id"] == "alice")
     assert alice["drawn_card"] is not None
 
@@ -132,7 +152,9 @@ def test_get_state_hides_drawn_card_on_someone_elses_turn():
     state = engine.get_state(game_id, "alice")
     state.current_player_index = 1  # bob's turn
 
-    data = _run(get_state(game_id, player_id="alice", token=created["tokens"]["alice"]))
+    data = _run(
+        get_state(game_id, player_id="alice", authorization=_bearer(created["tokens"]["alice"]))
+    )
     alice = next(p for p in data["players"] if p["id"] == "alice")
     assert "drawn_card" not in alice
 
@@ -146,7 +168,9 @@ def test_get_legal_actions_returns_actions_for_player():
     state.deck = [CardType.GUARD]
 
     actions = _run(
-        get_legal_actions(game_id, player_id="alice", token=created["tokens"]["alice"])
+        get_legal_actions(
+            game_id, player_id="alice", authorization=_bearer(created["tokens"]["alice"])
+        )
     )
     assert len(actions) > 0
     assert all(a["player_id"] == "alice" for a in actions)
@@ -155,7 +179,11 @@ def test_get_legal_actions_returns_actions_for_player():
 def test_get_legal_actions_returns_404_for_nonexistent_game():
     """GET /games/{game_id}/actions returns 404 for unknown game."""
     with pytest.raises(HTTPException) as exc_info:
-        _run(get_legal_actions("nonexistent", player_id="alice", token="whatever"))
+        _run(
+            get_legal_actions(
+                "nonexistent", player_id="alice", authorization=_bearer("whatever")
+            )
+        )
 
     assert exc_info.value.status_code == 404
 
@@ -168,7 +196,7 @@ def test_get_legal_actions_rejects_another_players_token():
     with pytest.raises(HTTPException) as exc_info:
         _run(
             get_legal_actions(
-                game_id, player_id="alice", token=created["tokens"]["bob"]
+                game_id, player_id="alice", authorization=_bearer(created["tokens"]["bob"])
             )
         )
 

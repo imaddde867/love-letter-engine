@@ -21,7 +21,6 @@ class ActionRequest(BaseModel):
     """Request body for POST /games/{game_id}/actions."""
 
     player_id: str
-    token: str
     action_type: str = "play_card"
     card_in_hand: CardType
     other_card: Optional[CardType] = None

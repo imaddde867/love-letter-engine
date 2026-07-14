@@ -63,7 +63,9 @@ def test_drive_game_plays_a_full_bot_vs_bot_game(client):
     assert winner in ("alice", "bob")
 
     final_state = client.get(
-        f"/games/{game_id}", params={"player_id": "alice", "token": tokens["alice"]}
+        f"/games/{game_id}",
+        params={"player_id": "alice"},
+        headers={"Authorization": f"Bearer {tokens['alice']}"},
     ).json()
     winner_tokens = next(
         p["favor_tokens"] for p in final_state["players"] if p["id"] == winner
@@ -92,7 +94,9 @@ def test_drive_game_crosses_multiple_round_boundaries(client):
     )
 
     final_state = client.get(
-        f"/games/{game_id}", params={"player_id": "alice", "token": tokens["alice"]}
+        f"/games/{game_id}",
+        params={"player_id": "alice"},
+        headers={"Authorization": f"Bearer {tokens['alice']}"},
     ).json()
     assert final_state["round"] > 1
     assert winner in ("alice", "bob")
@@ -156,7 +160,9 @@ def test_get_state_via_http_rejects_spoofed_player_id():
         game_id = create_resp.json()["game_id"]
 
         response = c.get(
-            f"/games/{game_id}", params={"player_id": "bob", "token": "guessed-token"}
+            f"/games/{game_id}",
+            params={"player_id": "bob"},
+            headers={"Authorization": "Bearer guessed-token"},
         )
         assert response.status_code == 403
 
@@ -171,9 +177,41 @@ def test_post_action_via_http_rejects_spoofed_player_id():
             f"/games/{game_id}/actions",
             json={
                 "player_id": "bob",
-                "token": "guessed-token",
                 "action_type": "play_card",
                 "card_in_hand": 5,
             },
+            headers={"Authorization": "Bearer guessed-token"},
         )
         assert response.status_code == 403
+
+
+def test_get_state_via_http_requires_authorization_header():
+    """Omitting the Authorization header entirely is rejected, not just a bad token."""
+    with TestClient(app) as c:
+        create_resp = c.post("/games", json={"player_ids": ["alice", "bob"]})
+        body = create_resp.json()
+        game_id = body["game_id"]
+
+        response = c.get(f"/games/{game_id}", params={"player_id": "alice"})
+        assert response.status_code == 422
+
+
+def test_token_is_not_accepted_as_a_query_parameter_anymore():
+    """Regression: a token in the query string must not authorize the request.
+
+    Query strings end up in browser history, proxy access logs, and
+    Referer headers — the token must only be honored via the
+    Authorization header.
+    """
+    with TestClient(app) as c:
+        create_resp = c.post("/games", json={"player_ids": ["alice", "bob"]})
+        body = create_resp.json()
+        game_id = body["game_id"]
+        token = body["tokens"]["alice"]
+
+        response = c.get(
+            f"/games/{game_id}", params={"player_id": "alice", "token": token}
+        )
+        # No Authorization header supplied — a query-string token must not
+        # substitute for one.
+        assert response.status_code == 422

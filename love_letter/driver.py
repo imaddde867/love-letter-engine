@@ -122,10 +122,14 @@ def drive_game(
     watcher_id = next(iter(bot_assignments))
     stalled_polls = 0
 
+    def _auth_headers(player_id: str) -> dict[str, str]:
+        return {"Authorization": f"Bearer {tokens[player_id]}"}
+
     while True:
         state = client.get(
             f"/games/{game_id}",
-            params={"player_id": watcher_id, "token": tokens[watcher_id]},
+            params={"player_id": watcher_id},
+            headers=_auth_headers(watcher_id),
         ).json()
 
         winner = _is_game_over(state)
@@ -141,7 +145,8 @@ def drive_game(
 
         actions = client.get(
             f"/games/{game_id}/actions",
-            params={"player_id": current_id, "token": tokens[current_id]},
+            params={"player_id": current_id},
+            headers=_auth_headers(current_id),
         ).json()
         if not actions:
             stalled_polls += 1
@@ -155,13 +160,16 @@ def drive_game(
         # exposes" guarantee.
         actor_state = client.get(
             f"/games/{game_id}",
-            params={"player_id": current_id, "token": tokens[current_id]},
+            params={"player_id": current_id},
+            headers=_auth_headers(current_id),
         ).json()
 
         strategy = STRATEGIES[bot_assignments[current_id]]
-        chosen = {**strategy(actions, actor_state), "token": tokens[current_id]}
+        chosen = strategy(actions, actor_state)
 
-        response = client.post(f"/games/{game_id}/actions", json=chosen)
+        response = client.post(
+            f"/games/{game_id}/actions", json=chosen, headers=_auth_headers(current_id)
+        )
         response.raise_for_status()
         stalled_polls = 0
 
