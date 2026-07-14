@@ -30,9 +30,10 @@ Dev server runs at `http://localhost:5173`. It talks to the backend API at
 
    This prints the new `game_id` and streams moves as they happen.
 
-3. Point the GUI at that `game_id` (via `CreateGame.tsx` or the URL, per the
-   app's UI) to spectate or play through the browser.
+3. Point the GUI at that `game_id` by copying the `love_letter watch` command
+   shown after creation and running it in a terminal; the GUI itself currently
+   only creates new games, not attach to existing ones.
 
 To attach the driver to a game the GUI already created instead, pass
-`--game-id <id>` along with `seat_id:strategy` bot assignments — see
+`--game-id <id>` along with `seat_id:strategy:token` bot assignments — see
 `python -m love_letter watch --help`.
