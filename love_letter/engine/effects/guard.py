@@ -31,7 +31,8 @@ class GuardEffect:
         guess = action.guess
 
         if target_id is None:
-            raise ValueError("Guard requires a target_player")
+            # No valid target (e.g. every opponent is protected) — no effect.
+            return state
         if guess is None:
             raise ValueError("Guard requires a guess (card type)")
 

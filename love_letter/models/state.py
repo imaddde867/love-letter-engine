@@ -38,6 +38,14 @@ class GameState:
         """Number of cards remaining in the deck."""
         return len(self.deck)
 
+    @property
+    def current_player_id(self) -> Optional[str]:
+        """ID of the player whose turn it is, or None if nobody is active."""
+        active_players = [pid for pid, p in self.players.items() if p.is_active]
+        if not active_players:
+            return None
+        return active_players[self.current_player_index % len(active_players)]
+
     def draw_card(self) -> Optional[CardType]:
         """Draw the next card: from the deck, falling back to the facedown card.
 
