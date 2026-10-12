@@ -24,3 +24,7 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local agent instructions
+agents.md
+AGENTS.md
