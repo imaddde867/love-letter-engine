@@ -27,7 +27,8 @@ class KingEffect:
             ValueError: If target_player is missing.
         """
         if action.target_player is None:
-            raise ValueError("King requires a target_player")
+            # No valid target (e.g. every opponent is protected) — no effect.
+            return state
 
         actor = state.players[action.player_id]
         target = state.players[action.target_player]

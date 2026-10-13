@@ -48,7 +48,7 @@ def test_round_always_ends():
     game_id = engine.create_game(["alice", "bob", "carol"])
 
     state = engine.get_state(game_id, "alice")
-    assert not engine._is_round_over(state) or state.deck_count == 0
+    assert not engine.is_round_over(state) or state.deck_count == 0
 
 
 def test_favor_tokens_never_negative():

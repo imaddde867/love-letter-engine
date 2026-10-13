@@ -138,6 +138,12 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
             message=f"Player {player_id} is eliminated",
             code="PLAYER_NOT_ACTIVE",
         ))
+    elif player_id != state.current_player_id:
+        violations.append(Violation(
+            field="player_id",
+            message=f"It is not {player_id}'s turn",
+            code="NOT_PLAYER_TURN",
+        ))
 
     # Princess must be discarded with other_card=None
     if action.card_in_hand == CardType.PRINCESS and action.other_card is not None:
@@ -158,8 +164,9 @@ def validate_action(action: Any, player_id: str, state: Any) -> list[Violation]:
     # Targeting cards require a valid target_player
     _validate_target(action, state, violations)
 
-    # Guard-specific: guess required and cannot be GUARD
-    if action.card_in_hand == CardType.GUARD:
+    # Guard-specific: guess required and cannot be GUARD (unless there is no
+    # valid target at all, in which case Guard is a no-op play)
+    if action.card_in_hand == CardType.GUARD and action.target_player is not None:
         if action.guess is None:
             violations.append(Violation(
                 field="guess",
@@ -186,20 +193,25 @@ def _validate_target(action: Any, state: Any, violations: list[Violation]) -> No
         state: The current game state.
         violations: Mutable list of Violations to append to.
     """
-    from love_letter.engine.legal_actions import _TARGETING_CARDS
+    from love_letter.engine.legal_actions import _TARGETING_CARDS, _valid_targets
+    from love_letter.models.card import CardType
 
     if action.card_in_hand not in _TARGETING_CARDS:
         return
 
     target_id = action.target_player
+    include_self = action.card_in_hand == CardType.PRINCE
 
-    # Missing or empty target
+    # Missing or empty target: only legal when nobody can be targeted at all
+    # (e.g. every opponent is protected by Handmaid), per the rules. Prince
+    # can always target itself, so it never has zero valid targets.
     if not target_id:
-        violations.append(Violation(
-            field="target_player",
-            message=f"{action.card_in_hand.name} requires a target_player",
-            code="MISSING_TARGET",
-        ))
+        if _valid_targets(state, action.player_id, include_self=include_self):
+            violations.append(Violation(
+                field="target_player",
+                message=f"{action.card_in_hand.name} requires a target_player",
+                code="MISSING_TARGET",
+            ))
         return
 
     # Target player does not exist in game

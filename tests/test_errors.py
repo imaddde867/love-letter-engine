@@ -132,6 +132,32 @@ def test_validate_action_prince_missing_target():
     assert "MISSING_TARGET" in codes
 
 
+def test_validate_action_prince_no_target_rejected_even_when_opponent_protected():
+    """Prince target_player=None is still invalid when self-targeting is available.
+
+    Regression: unlike Guard/Priest/Baron/King, Prince can always target
+    itself, so it should never be allowed to submit target_player=None —
+    even when every opponent is protected by Handmaid.
+    """
+    state = _make_state()
+    state.players["bob"].protected_until_next_turn = True
+    action = _make_action(card_in_hand=CardType.PRINCE, target_player=None)
+
+    violations = validate_action(action, "alice", state)
+    codes = [v.code for v in violations]
+    assert "MISSING_TARGET" in codes
+
+
+def test_validate_action_prince_self_target_allowed_when_opponent_protected():
+    """Prince target_player=<self> is valid when every opponent is protected."""
+    state = _make_state()
+    state.players["bob"].protected_until_next_turn = True
+    action = _make_action(card_in_hand=CardType.PRINCE, target_player="alice")
+
+    violations = validate_action(action, "alice", state)
+    assert violations == []
+
+
 def test_validate_action_guard_missing_guess():
     """Guard without guess returns MISSING_GUARD_GUESS violation."""
     action = _make_action(guess=None)
